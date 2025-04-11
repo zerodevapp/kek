@@ -1,3 +1,21 @@
+Metadata-Version: 2.4
+Name: aa_helper
+Version: 0.1.0
+Summary: A CLI tool to parse, hash, and debug EIP-4337 UserOperations.
+Author-email: User <user@example.com>
+Project-URL: Homepage, https://github.com/user/aa-helper
+Project-URL: Issues, https://github.com/user/aa-helper/issues
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Topic :: Utilities
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: pysha3>=1.0.0
+Requires-Dist: eth-abi>=4.0.0
+Requires-Dist: eth-keys>=0.4.0
+
 # AA Helper
 
 A CLI tool to parse, hash, verify signatures, and debug EIP-4337 UserOperations.

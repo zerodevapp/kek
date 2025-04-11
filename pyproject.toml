@@ -1,11 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
-name = "helper"
+name = "aa_helper"
 version = "0.1.0"
-description = "Add your description here"
-readme = "README.md"
-requires-python = ">=3.10"
-dependencies = [
-    "eth-abi>=5.2.0",
-    "eth-keys>=0.7.0",
-    "pysha3>=1.0.2",
+authors = [
+  { name="User", email="user@example.com" }, # Replace with actual if desired
 ]
+description = "A CLI tool to parse, hash, and debug EIP-4337 UserOperations."
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License", # Assuming MIT, change if needed
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "pysha3 >= 1.0.0",
+    "eth-abi >= 4.0.0", # Check for appropriate minimum versions
+    "eth-keys >= 0.4.0", 
+]
+
+[project.scripts]
+aa-script = "aa_helper.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/user/aa-helper" # Example URL
+Issues = "https://github.com/user/aa-helper/issues" # Example URL 
