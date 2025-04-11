@@ -33,25 +33,28 @@ The tool provides several commands:
 
 ```bash
 # Get help
-aa --help
+aa-script --help
 
 # Parse raw UserOp text to formatted JSON
-aa parse "<raw_user_op_text>"
+aa-script parse "<raw_user_op_text>"
 
 # Calculate UserOp hash
-aa userOpHash "<raw_user_op_text>" --chainId <id> [--entrypoint <addr>]
+aa-script userOpHash "<raw_user_op_text>" --chainId <id> [--entrypoint <addr>]
 
 # Recover signer (show all attempts)
-aa signer "<raw_user_op_text>" --chainId <id> --signer [--entrypoint <addr>]
+aa-script signer "<raw_user_op_text>" --chainId <id> --signer [--entrypoint <addr>]
 
 # Verify signer against a specific address
-aa signer "<raw_user_op_text>" --chainId <id> --signer <expected_addr> [--entrypoint <addr>]
+aa-script signer "<raw_user_op_text>" --chainId <id> --signer <expected_addr> [--entrypoint <addr>]
 
 # Generate debug cast call command
-aa debug "<raw_user_op_text>" --rpc-url <url>
+aa-script debug "<raw_user_op_text>" --rpc-url <url>
 
 # Generate AND execute debug cast call command
-aa debug "<raw_user_op_text>" --rpc-url <url> --run
+aa-script debug "<raw_user_op_text>" --rpc-url <url> --run
+
+# or pipe to shell
+aa-script debug "<raw_user_op_text>" --rpc-url <url> | sh
 ```
 
 **Note:** Wrap multi-line raw UserOperation text in quotes (`"..."`). 
