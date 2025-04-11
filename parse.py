@@ -2,7 +2,9 @@ import json
 # Requires: pip install pysha3 eth-abi eth_keys
 import sha3
 from eth_abi import encode
-import argparse # Added for command-line arguments
+import argparse
+import sys # For sys.exit
+import subprocess # For running shell commands
 from eth_keys.exceptions import BadSignature
 from eth_keys import keys # Added for signature recovery
 
@@ -372,134 +374,222 @@ def recover_signer(digest_bytes: bytes, signature_hex: str) -> str | None:
 # --- Command-Line Execution Logic ---
 def main():
     DEFAULT_ENTRY_POINT = "0x0000000071727De22E5E9d8BAf0edAc6f37da032" # v0.7
+    ENTRY_POINT_V07 = DEFAULT_ENTRY_POINT # Specific constant for debug
 
-    parser = argparse.ArgumentParser(description="Parse raw UserOperation text, format to JSON, and calculate hashes.")
-    parser.add_argument("raw_input", help="Raw UserOperation text data (like bundler debug output). Wrap in quotes if it contains spaces.")
-    parser.add_argument("-c", "--chainId", type=int, required=True, help="Chain ID for UserOpHash calculation.")
-    parser.add_argument("-e", "--entrypoint", default=DEFAULT_ENTRY_POINT, help=f"EntryPoint contract address (default: {DEFAULT_ENTRY_POINT}).")
-    parser.add_argument("-s", "--signer", help="Optional: Expected signer address to verify against recovery results.")
+    parser = argparse.ArgumentParser(description="Parse UserOperation text, calculate hashes, verify signatures, and debug calls.") # Updated description
+    subparsers = parser.add_subparsers(dest='command', required=True, help='Sub-command help')
+
+    # --- `parse` subcommand --- 
+    parser_parse = subparsers.add_parser('parse', help='Parse raw UserOperation text and output formatted JSON.')
+    parser_parse.add_argument("raw_input", help="Raw UserOperation text data (like bundler debug output). Wrap in quotes.")
+
+    # --- `userOpHash` subcommand --- 
+    parser_hash = subparsers.add_parser('userOpHash', help='Calculate the EIP-4337 UserOperation hash.')
+    parser_hash.add_argument("raw_input", help="Raw UserOperation text data. Wrap in quotes.")
+    parser_hash.add_argument("-c", "--chainId", type=int, required=True, help="Chain ID for UserOpHash calculation.")
+    parser_hash.add_argument("-e", "--entrypoint", default=DEFAULT_ENTRY_POINT, help=f"EntryPoint contract address (default: {DEFAULT_ENTRY_POINT}).")
+
+    # --- `signer` subcommand --- 
+    parser_signer = subparsers.add_parser('signer', help='Recover signer from signature or verify against an expected signer.')
+    parser_signer.add_argument("raw_input", help="Raw UserOperation text data. Wrap in quotes.")
+    parser_signer.add_argument("-c", "--chainId", type=int, required=True, help="Chain ID for UserOpHash calculation (needed for digest)." )
+    parser_signer.add_argument("-e", "--entrypoint", default=DEFAULT_ENTRY_POINT, help=f"EntryPoint contract address (default: {DEFAULT_ENTRY_POINT}).")
+    parser_signer.add_argument("-s", "--signer", nargs='?', const=True, default=None,
+                             help="Perform signature recovery. If an address is provided, verify against that address. If flag is used alone, show all recovery results.")
+
+    # --- `debug` subcommand --- 
+    parser_debug = subparsers.add_parser('debug', help='Generate `cast call --trace` command for EntryPoint.handleOps, optionally execute it.') # Updated help
+    parser_debug.add_argument("raw_input", help="Raw UserOperation text data. Wrap in quotes.")
+    parser_debug.add_argument("--rpc-url", required=True, help="RPC URL for the cast command.")
+    parser_debug.add_argument("--run", action='store_true', help="Execute the generated cast command instead of just printing it.")
 
     args = parser.parse_args()
 
-    # Validate signer address format if provided
-    if args.signer:
-        if not isinstance(args.signer, str) or not args.signer.startswith('0x') or len(args.signer) != 42:
-            print(f"Error: Invalid format for --signer address: {args.signer}")
-            import sys
-            sys.exit(1)
-        try:
-            # Basic hex check
-            bytes.fromhex(args.signer[2:])
-        except ValueError:
-             print(f"Error: Invalid hex characters in --signer address: {args.signer}")
-             import sys
-             sys.exit(1)
-
     try:
-        # 1. Parse raw text to intermediate JSON
-        intermediate_json = parse_text_to_json(args.raw_input)
-        # Load intermediate JSON once to get signature/sender before full formatting
+        # --- Common Setup: Parse raw input to intermediate JSON --- 
         try:
-             user_op_intermediate_data = json.loads(intermediate_json)
+            intermediate_json = parse_text_to_json(args.raw_input)
+            user_op_intermediate_data = json.loads(intermediate_json)
         except json.JSONDecodeError as e:
             print(f"\nError: Could not parse the initial text input into valid JSON: {e}")
-            import sys
+            sys.exit(1)
+        except Exception as e:
+            print(f"\nError during initial parsing: {e}")
             sys.exit(1)
 
-        # 2. Format intermediate JSON to PackedUserOperation JSON
-        final_json = format_json_to_solidity_struct(intermediate_json)
+        # --- Command Dispatch --- 
+        if args.command == 'parse':
+            # Action: Just parse and format
+            final_json = format_json_to_solidity_struct(intermediate_json)
+            print("--- Formatted PackedUserOperation JSON ---")
+            print(final_json)
+        
+        elif args.command == 'userOpHash':
+            # Action: Parse, format, calculate userOpHash
+            final_json = format_json_to_solidity_struct(intermediate_json)
+            user_op_hash = calculate_user_op_hash(final_json, args.entrypoint, args.chainId)
+            print("--- Calculated UserOpHash ---")
+            print(user_op_hash)
 
-        # 3. Calculate UserOpHash
-        user_op_hash = calculate_user_op_hash(final_json, args.entrypoint, args.chainId)
-        user_op_hash_bytes = hex_to_bytes(user_op_hash)
+        elif args.command == 'signer':
+            # Action: Parse, format, all hashes, recovery/verification
+            
+            # -- Validate signer address format if provided --
+            expected_signer_address = None
+            if isinstance(args.signer, str):
+                expected_signer_address = args.signer
+                if not expected_signer_address.startswith('0x') or len(expected_signer_address) != 42:
+                    print(f"Error: Invalid format for --signer address: {expected_signer_address}")
+                    sys.exit(1)
+                try:
+                    bytes.fromhex(expected_signer_address[2:])
+                except ValueError:
+                     print(f"Error: Invalid hex characters in --signer address: {expected_signer_address}")
+                     sys.exit(1)
 
-        # 4. Calculate EIP-191 hash of the UserOpHash *bytes*
-        eip191_hash_of_hash_bytes_hex = eip191_hash_hex(user_op_hash)
-        eip191_digest_bytes = hex_to_bytes(eip191_hash_of_hash_bytes_hex)
+            # -- Calculate Hashes --
+            final_json = format_json_to_solidity_struct(intermediate_json)
+            user_op_hash = calculate_user_op_hash(final_json, args.entrypoint, args.chainId)
+            user_op_hash_bytes = hex_to_bytes(user_op_hash)
+            
+            eip191_hash_of_hash_bytes_hex = eip191_hash_hex(user_op_hash)
+            eip191_digest_bytes = hex_to_bytes(eip191_hash_of_hash_bytes_hex)
+            
+            eip191_hash_of_hash_string_hex = eip191_hash_message(user_op_hash)
+            eip191_digest_string_bytes = hex_to_bytes(eip191_hash_of_hash_string_hex)
 
-        # 5. Calculate EIP-191 hash of the UserOpHash *hex string itself* (as a message)
-        eip191_hash_of_hash_string_hex = eip191_hash_message(user_op_hash)
-        eip191_digest_string_bytes = hex_to_bytes(eip191_hash_of_hash_string_hex) # Bytes of the resulting hash
+            # -- Perform Recovery/Verification --
+            print("\n--- Signature Recovery --- ")
+            signature_hex = user_op_intermediate_data.get("signature")
 
-        # --- Print Core Results ---
-        print("--- Formatted PackedUserOperation JSON ---")
-        print(final_json)
-
-        print("\n--- Calculated UserOpHash ---")
-        print(user_op_hash)
-
-        print("\n--- EIP-191 Hashes of UserOpHash ---")
-        print(f"Hash of UserOpHash Bytes (eip191_hash_hex):    {eip191_hash_of_hash_bytes_hex}")
-        print(f"Hash of UserOpHash String (eip191_hash_message): {eip191_hash_of_hash_string_hex}")
-
-        # --- 6. Attempt Signature Recovery ---
-        signature_hex = user_op_intermediate_data.get("signature")
-        sender_address_from_op = user_op_intermediate_data.get("sender") # Used only for context now
-
-        print("\n--- Signature Recovery --- ") # Renamed section slightly
-
-        if not signature_hex or signature_hex == '0x':
-            print("No signature provided in input.")
-        elif len(signature_hex) != 132:
-             print(f"Invalid signature length: {len(signature_hex)} characters (expected 132 for 0x + 65 bytes)")
-        else:
-            # Attempt recovery with the 3 digests
-            recovered_from_userophash = recover_signer(user_op_hash_bytes, signature_hex)
-            recovered_from_eip191_bytes = recover_signer(eip191_digest_bytes, signature_hex)
-            recovered_from_eip191_string = recover_signer(eip191_digest_string_bytes, signature_hex)
-
-            # --- Conditional Output based on --signer --- 
-            if args.signer:
-                # Mode: Verify against provided --signer
-                print(f"Verifying signature against expected signer: {args.signer}")
-                print(f"Signature provided: {signature_hex}")
-                match_found_signer = False
-
-                if recovered_from_userophash and recovered_from_userophash.lower() == args.signer.lower():
-                    print(f"  ✅ Signature matches signer for Digest 1 (UserOpHash Bytes: 0x{user_op_hash_bytes.hex()})")
-                    match_found_signer = True
-                
-                if recovered_from_eip191_bytes and recovered_from_eip191_bytes.lower() == args.signer.lower():
-                    print(f"  ✅ Signature matches signer for Digest 2 (EIP-191 of UserOpHash Bytes: 0x{eip191_digest_bytes.hex()})")
-                    match_found_signer = True
-
-                if recovered_from_eip191_string and recovered_from_eip191_string.lower() == args.signer.lower():
-                     print(f"  ✅ Signature matches signer for Digest 3 (EIP-191 of UserOpHash String: 0x{eip191_digest_string_bytes.hex()})")
-                     match_found_signer = True
-                
-                if not match_found_signer:
-                    print(f"  ❌ Signature did NOT recover the specified signer address ({args.signer}) for any tested digest.")
-                    # Optionally print failed recovery attempts for debugging?
-                    # print("  Recovery attempts:")
-                    # print(f"    Digest 1 -> {recovered_from_userophash or 'Failed'}")
-                    # print(f"    Digest 2 -> {recovered_from_eip191_bytes or 'Failed'}")
-                    # print(f"    Digest 3 -> {recovered_from_eip191_string or 'Failed'}")
-
+            if not signature_hex or signature_hex == '0x':
+                print("No signature provided in input.")
+            elif len(signature_hex) != 132:
+                 print(f"Invalid signature length: {len(signature_hex)} characters (expected 132 for 0x + 65 bytes)")
             else:
-                # Mode: Show all recovery results (no --signer provided)
-                if sender_address_from_op:
-                    print(f"Sender Address (from Op, for context): {sender_address_from_op}")
-                print(f"Signature:                             {signature_hex}")
-                print("\nRecovery Results:")
-                print("-" * 20)
-                # Digest 1
-                print(f"Digest 1 (UserOpHash Bytes): 0x{user_op_hash_bytes.hex()}")
-                print(f"  Recovered Address: {recovered_from_userophash or 'Failed'}")
-                print("-" * 20)
-                # Digest 2
-                print(f"Digest 2 (EIP-191 of UserOpHash Bytes): 0x{eip191_digest_bytes.hex()}")
-                print(f"  Recovered Address: {recovered_from_eip191_bytes or 'Failed'}")
-                print("-" * 20)
-                # Digest 3
-                print(f"Digest 3 (EIP-191 of UserOpHash String): 0x{eip191_digest_string_bytes.hex()}")
-                print(f"  Recovered Address: {recovered_from_eip191_string or 'Failed'}")
-                print("-" * 20)
+                recovered_from_userophash = recover_signer(user_op_hash_bytes, signature_hex)
+                recovered_from_eip191_bytes = recover_signer(eip191_digest_bytes, signature_hex)
+                recovered_from_eip191_string = recover_signer(eip191_digest_string_bytes, signature_hex)
+
+                if expected_signer_address:
+                    # Mode 3: --signer <address>
+                    print(f"Verifying signature against expected signer: {expected_signer_address}")
+                    print(f"Signature provided: {signature_hex}")
+                    match_found_signer = False
+                    if recovered_from_userophash and recovered_from_userophash.lower() == expected_signer_address.lower():
+                        print(f"  ✅ Signature matches signer for Digest 1 (UserOpHash Bytes: 0x{user_op_hash_bytes.hex()})")
+                        match_found_signer = True
+                    if recovered_from_eip191_bytes and recovered_from_eip191_bytes.lower() == expected_signer_address.lower():
+                        print(f"  ✅ Signature matches signer for Digest 2 (EIP-191 of UserOpHash Bytes: 0x{eip191_digest_bytes.hex()})")
+                        match_found_signer = True
+                    if recovered_from_eip191_string and recovered_from_eip191_string.lower() == expected_signer_address.lower():
+                         print(f"  ✅ Signature matches signer for Digest 3 (EIP-191 of UserOpHash String: 0x{eip191_digest_string_bytes.hex()})")
+                         match_found_signer = True
+                    if not match_found_signer:
+                        print(f"  ❌ Signature did NOT recover the specified signer address ({expected_signer_address}) for any tested digest.")
+                
+                else: # args.signer was True (flag used alone)
+                    # Mode 2: --signer (flag only)
+                    sender_address_from_op = user_op_intermediate_data.get("sender")
+                    if sender_address_from_op:
+                        print(f"Sender Address (from Op, for context): {sender_address_from_op}")
+                    print(f"Signature:                             {signature_hex}")
+                    print("\nShowing all recovery results (no specific signer provided):")
+                    print("-" * 20)
+                    print(f"Digest 1 (UserOpHash Bytes): 0x{user_op_hash_bytes.hex()}")
+                    print(f"  Recovered Address: {recovered_from_userophash or 'Failed'}")
+                    print("-" * 20)
+                    print(f"Digest 2 (EIP-191 of UserOpHash Bytes): 0x{eip191_digest_bytes.hex()}")
+                    print(f"  Recovered Address: {recovered_from_eip191_bytes or 'Failed'}")
+                    print("-" * 20)
+                    print(f"Digest 3 (EIP-191 of UserOpHash String): 0x{eip191_digest_string_bytes.hex()}")
+                    print(f"  Recovered Address: {recovered_from_eip191_string or 'Failed'}")
+                    print("-" * 20)
+        
+        elif args.command == 'debug':
+            # Action: Generate cast call command, execute only if --run is specified
+            print("\n--- Debug handleOps Call --- ")
+            beneficiary = "0x0000000000000000000000000000000000000000" # Hardcoded zero address
+
+            # -- Prepare UserOperation data for encoding -- 
+            final_json = format_json_to_solidity_struct(intermediate_json)
+            user_op_dict = json.loads(final_json)
+
+            user_op_tuple = (
+                user_op_dict['sender'],
+                int(user_op_dict['nonce']),
+                hex_to_bytes(user_op_dict['initCode']),
+                hex_to_bytes(user_op_dict['callData']),
+                hex_to_bytes(user_op_dict['accountGasLimits']),
+                int(user_op_dict['preVerificationGas']),
+                hex_to_bytes(user_op_dict['gasFees']),
+                hex_to_bytes(user_op_dict['paymasterAndData']),
+                hex_to_bytes(user_op_dict['signature'])
+            )
+            ops_array = [user_op_tuple]
+
+            user_op_abi_type = '(address,uint256,bytes,bytes,bytes32,uint256,bytes32,bytes,bytes)'
+            handle_ops_input_types = [f'{user_op_abi_type}[]', 'address']
+            
+            # -- ABI Encode handleOps call --
+            try:
+                encoded_call_data = encode(
+                    handle_ops_input_types,
+                    [ops_array, beneficiary] # Use hardcoded zero address
+                )
+            except Exception as e:
+                print(f"\nError ABI encoding handleOps data: {e}")
+                sys.exit(1)
+
+            handle_ops_selector = "0x765e827f" 
+            full_calldata = handle_ops_selector + encoded_call_data.hex()
+            
+            # -- Construct cast command list and string --
+            cast_command_list = [
+                "cast", "call", 
+                ENTRY_POINT_V07, 
+                full_calldata, 
+                "--rpc-url", args.rpc_url, 
+                "--trace"
+            ]
+            cast_command_string = ' '.join(cast_command_list) # For printing
+
+            if args.run:
+                # -- Execute cast command --
+                print(f"\nExecuting command: {cast_command_string}")
+                try:
+                    result = subprocess.run(
+                        cast_command_list, 
+                        capture_output=True, text=True, check=False
+                    )
+                    
+                    print("\n--- Command Output --- ")
+                    if result.stdout:
+                        print("[STDOUT]")
+                        print(result.stdout.strip())
+                    if result.stderr:
+                        print("[STDERR]")
+                        print(result.stderr.strip())
+                    
+                    if result.returncode != 0:
+                        print(f"\nWarning: Command exited with non-zero status code: {result.returncode}")
+
+                except FileNotFoundError:
+                     print("\nError: 'cast' command not found. Make sure foundry is installed and in your PATH.")
+                     sys.exit(1)
+                except Exception as sub_error:
+                     print(f"\nError executing command: {sub_error}")
+                     sys.exit(1)
+            else:
+                 # -- Print cast command --
+                print("\nGenerated `cast call` command (use --run to execute):")
+                print(cast_command_string)
 
     except Exception as e:
-        print(f"\nError processing input: {e}")
-        # Optionally exit with non-zero status
-        # import sys
-        # sys.exit(1)
+        print(f"\nAn unexpected error occurred: {e}")
+        import traceback
+        traceback.print_exc() # Print full traceback for debugging
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
