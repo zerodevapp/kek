@@ -58,3 +58,6 @@ aa-script debug "<raw_user_op_text>" --rpc-url <url> | sh
 ```
 
 **Note:** Wrap multi-line raw UserOperation text in quotes (`"..."`). 
+
+- [ ] Add support for getting userOp json or packedUserOp as input
+- [ ] Use entrypoint simulation contract to get the detailed trace
