@@ -1,0 +1,55 @@
+# --- Python Virtual Environments ---
+.venv/
+venv/
+env/
+ENV/
+*.env
+
+# --- Python cache files ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Distribution / packaging ---
+build/
+dist/
+*.egg-info/
+*.egg
+*.whl
+*.tar.gz
+*.manifest
+*.spec
+pip-wheel-metadata/
+
+# --- Unit testing / coverage reports ---
+htmlcov/
+.coverage
+.pytest_cache/
+nosetests.xml
+coverage.xml
+*.prof
+*.lprof
+*.out
+
+# --- IDE / Editor / OS specific ---
+# VS Code
+.vscode/
+# PyCharm
+.idea/
+# Vim
+*.sw[op]
+# Emacs
+*~
+# macOS
+.DS_Store
+# Windows
+Thumbs.db
+
+# --- Logs and temporary files ---
+*.log
+*.tmp
+
+# --- Secrets (add specific files if you use them) ---
+# *.envrc
+# credentials.json
+# config.py # If it contains secrets 
