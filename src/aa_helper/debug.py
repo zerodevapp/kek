@@ -74,5 +74,4 @@ def run_debug_command(args, user_op_intermediate_data):
     cast_command_string = ' '.join(cast_command_list) # For printing
 
     # -- Print cast command --
-    print("\nGenerated `cast call` command:")
     print(cast_command_string)
