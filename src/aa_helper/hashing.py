@@ -15,8 +15,11 @@ def keccak(data_bytes: bytes) -> bytes:
 def calculate_user_op_hash(user_op_json: str, entry_point_address: str, chain_id: int) -> str:
     """Calculates the userOpHash according to EIP-4337 EntryPoint logic.
     
+    Expects user_op_json to be the output of format_user_op_data, containing
+    pre-packed fields like accountGasLimits and gasFees.
+
     Args:
-        user_op_json: The JSON string representation of the PackedUserOperation.
+        user_op_json: JSON string of the PackedUserOperation.
         entry_point_address: The address of the EntryPoint contract.
         chain_id: The chain ID.
 
@@ -28,32 +31,37 @@ def calculate_user_op_hash(user_op_json: str, entry_point_address: str, chain_id
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid UserOperation JSON provided: {e}")
 
-    # --- Prepare data and calculate intermediate hashes --- 
+    # --- Extract values and hash byte fields --- 
     try:
         sender = user_op['sender']
-        if not (isinstance(sender, str) and sender.startswith('0x')):
-             raise ValueError("Sender must be a 0x-prefixed hex string")
-        nonce = int(user_op['nonce'])
-        pre_verification_gas = int(user_op['preVerificationGas'])
-        init_code_bytes = hex_to_bytes(user_op['initCode'])
+        nonce = int(user_op['nonce']) # Stored as string, convert to int
+        pre_verification_gas = int(user_op['preVerificationGas']) # Stored as string, convert to int
+
+        # These should be bytes32 hex strings from formatting step
+        account_gas_limits_bytes = hex_to_bytes(user_op['accountGasLimits']) 
+        gas_fees_bytes = hex_to_bytes(user_op['gasFees'])
+        if len(account_gas_limits_bytes) != 32:
+            raise ValueError(f"accountGasLimits must be 32 bytes hex, got {len(account_gas_limits_bytes)} bytes from {user_op['accountGasLimits']}")
+        if len(gas_fees_bytes) != 32:
+             raise ValueError(f"gasFees must be 32 bytes hex, got {len(gas_fees_bytes)} bytes from {user_op['gasFees']}")
+
+        # These are bytes fields from formatting step, hash them now
+        init_code_bytes = hex_to_bytes(user_op['initCode']) 
         call_data_bytes = hex_to_bytes(user_op['callData'])
         paymaster_and_data_bytes = hex_to_bytes(user_op['paymasterAndData'])
-        account_gas_limits_bytes = hex_to_bytes(user_op['accountGasLimits'])
-        if len(account_gas_limits_bytes) != 32:
-            raise ValueError(f"accountGasLimits must be 32 bytes, got {len(account_gas_limits_bytes)}")
-        gas_fees_bytes = hex_to_bytes(user_op['gasFees'])
-        if len(gas_fees_bytes) != 32:
-             raise ValueError(f"gasFees must be 32 bytes, got {len(gas_fees_bytes)}")
-        if not (isinstance(entry_point_address, str) and entry_point_address.startswith('0x')):
-            raise ValueError("EntryPoint address must be a 0x-prefixed hex string")
-    except KeyError as e:
-        raise ValueError(f"Missing required key in UserOperation JSON: {e}")
-    except (ValueError, TypeError) as e:
-        raise ValueError(f"Invalid format in UserOperation JSON or arguments: {e}")
+        
+        hash_init_code = keccak(init_code_bytes)
+        hash_call_data = keccak(call_data_bytes)
+        hash_paymaster_and_data = keccak(paymaster_and_data_bytes)
 
-    hash_init_code = keccak(init_code_bytes)
-    hash_call_data = keccak(call_data_bytes)
-    hash_paymaster_and_data = keccak(paymaster_and_data_bytes)
+        # Validate entry point address format
+        if not (isinstance(entry_point_address, str) and entry_point_address.startswith('0x') and len(entry_point_address) == 42):
+            raise ValueError("EntryPoint address must be a 0x-prefixed hex string of 42 chars")
+            
+    except KeyError as e:
+        raise ValueError(f"Missing required key in formatted UserOperation JSON: {e}")
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Invalid format in formatted UserOperation JSON or arguments: {e}")
 
     # --- ABI Encode and Hash --- 
     packed_user_op_part_for_hash = encode(

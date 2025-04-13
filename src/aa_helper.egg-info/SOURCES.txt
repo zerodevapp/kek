@@ -6,6 +6,7 @@ src/aa_helper/debug.py
 src/aa_helper/hashing.py
 src/aa_helper/parsing.py
 src/aa_helper/signature.py
+src/aa_helper/test_hashing.py
 src/aa_helper/utils.py
 src/aa_helper.egg-info/PKG-INFO
 src/aa_helper.egg-info/SOURCES.txt

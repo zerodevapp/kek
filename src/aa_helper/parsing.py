@@ -28,201 +28,188 @@ def parse_gas_value_to_wei(value) -> int:
     except ValueError as e:
         raise ValueError(f"Could not parse gas value '{value}' to wei: {e}")
 
-# --- Input Handling ---
+def to_int_if_hex(value):
+    """Converts a hex string (0x...) to int, otherwise returns original."""
+    if isinstance(value, str) and value.startswith('0x'):
+        try:
+            return int(value, 16)
+        except ValueError:
+            return value # Return original if not valid hex
+    return value
+
+# --- Input Handling & Normalization ---
 
 def detect_and_load_input(input_str: str) -> dict:
-    """Detects input format (raw text, UserOp JSON, Packed JSON) and loads into a dict."""
+    """Detects input format and normalizes to a consistent intermediate dict format."""
     input_str = input_str.strip()
     is_likely_json = input_str.startswith('{') and input_str.endswith('}')
+    data = {}
 
     if is_likely_json:
         try:
-            data = json.loads(input_str)
-            if all(k in data for k in ["sender", "nonce", "accountGasLimits", "gasFees"]):
-                # print("Detected PackedUserOperation JSON input.")
-                # Need to convert packed fields back potentially, or treat as intermediate
-                # Let's try to convert relevant fields for consistency
-                for key in ["nonce", "preVerificationGas"]:
-                     if key in data and isinstance(data[key], str) and data[key].startswith('0x'):
-                         try: data[key] = int(data[key], 16)
-                         except ValueError: pass
-                # Gas fees might need unpacking? For now, pass as is.
-                return data
-            elif all(k in data for k in ["sender", "nonce", "callData"]):
-                # print("Detected UserOperation JSON input.")
-                # Normalize numeric fields (hex/int str -> int)
-                for key in ["nonce", "callGasLimit", "verificationGasLimit", "preVerificationGas", "paymasterVerificationGasLimit", "paymasterPostOpGasLimit"]:
-                    if key in data and isinstance(data[key], str) and data[key].startswith('0x'):
-                        try: data[key] = int(data[key], 16)
-                        except ValueError: pass 
-                    elif key in data and isinstance(data[key], str) and data[key].isdigit():
-                         try: data[key] = int(data[key])
-                         except ValueError: pass
-                         
-                # Specifically parse gas fees to wei int
-                for key in ["maxFeePerGas", "maxPriorityFeePerGas"]:
-                     if key in data:
-                         try: data[key] = parse_gas_value_to_wei(data[key])
-                         except ValueError as e:
-                             print(f"Warning: Could not parse JSON field '{key}': {e}. Skipping.")
-                             data[key] = 0 # Default to 0 if parsing fails
-                 
-                return data
-            else:
-                print("Warning: Input looks like JSON but format is unrecognized. Treating as raw text.")
-                pass
+            raw_data = json.loads(input_str)
+            # Try to normalize keys to lowercase for easier processing
+            # Handle potential conflicts carefully if needed (not done here)
+            normalized_data = {k.lower(): v for k, v in raw_data.items()}
+            data.update(normalized_data)
+            # print("Detected JSON input.")
         except json.JSONDecodeError:
-            pass
+            is_likely_json = False # Treat as raw text if JSON parsing fails
 
-    # --- Assume Raw Text Parsing --- 
-    # print("Assuming raw text input.")
-    parsed_data = {}
-    lines = input_str.splitlines()
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-        colon_index = line.find(':')
-        if colon_index == -1:
-            continue
-        key = line[:colon_index].strip()
-        value_str = line[colon_index + 1:].strip()
-        original_key = key # Keep original key case if needed elsewhere
-        key = key.lower() # Use lower case for matching
+    if not is_likely_json:
+        # print("Assuming raw text input.")
+        lines = input_str.splitlines()
+        temp_data = {}
+        for line in lines:
+            line = line.strip()
+            if not line: continue
+            colon_index = line.find(':')
+            if colon_index == -1: continue
+            key = line[:colon_index].strip().lower() # Normalize key
+            value_str = line[colon_index + 1:].strip()
+            temp_data[key] = value_str
+        data.update(temp_data)
 
-        # Handle specific fields first
-        if key in ["maxfeepergas", "maxpriorityfeepergas"]:
+    # --- Normalize values to consistent types --- 
+    normalized_output = {}
+    int_keys = ["nonce", "callgaslimit", "verificationgaslimit", "preverificationgas", "paymasterverificationgaslimit", "paymasterpostopgaslimit"]
+    gas_keys = ["maxfeepergas", "maxpriorityfeepergas"]
+    hex_keys = ["sender", "initcode", "calldata", "accountgaslimits", "gasfees", "paymasteranddata", "signature", "factory", "factorydata", "paymaster", "paymasterdata"]
+
+    for key, value in data.items():
+        l_key = key.lower()
+        original_key = key # Keep original for output dict if needed?
+        output_key = l_key # Use lowercase internally
+        
+        if output_key in int_keys:
             try:
-                parsed_data[original_key] = parse_gas_value_to_wei(value_str)
-            except ValueError as e:
-                print(f"Warning: Could not parse gas value for '{original_key}': {e}. Storing as string.")
-                parsed_data[original_key] = value_str # Store original if parse fails
-        elif value_str.isdigit():
-             if key in ['callgaslimit', 'verificationgaslimit', 'preverificationgas', 'paymasterverificationgaslimit', 'paymasterpostopgaslimit'] and len(value_str) < 18:
-                 try: parsed_data[original_key] = int(value_str)
-                 except ValueError: parsed_data[original_key] = value_str
-             else: parsed_data[original_key] = value_str # Keep large numbers like nonce as string
-        elif value_str.startswith("0x") and all(c in '0123456789abcdefABCDEF' for c in value_str[2:]):
-             if key in ["nonce", "callgaslimit", "verificationgaslimit", "preverificationgas", "paymasterverificationgaslimit", "paymasterpostopgaslimit"]:
-                 try: parsed_data[original_key] = int(value_str, 16)
-                 except ValueError: parsed_data[original_key] = value_str
+                # Convert potential hex strings to int
+                normalized_output[output_key] = int(value, 16) if isinstance(value, str) and value.startswith('0x') else int(value)
+            except (ValueError, TypeError):
+                print(f"Warning: Could not convert '{key}' value '{value}' to int. Storing as is.")
+                normalized_output[output_key] = value # Store original on error
+        elif output_key in gas_keys:
+             try:
+                normalized_output[output_key] = parse_gas_value_to_wei(value)
+             except ValueError as e:
+                 print(f"Warning: Could not parse gas value for '{key}': {e}. Setting to 0.")
+                 normalized_output[output_key] = 0
+        elif output_key in hex_keys:
+            # Ensure hex strings are 0x-prefixed and lowercase? Let's keep original for now.
+             if isinstance(value, str) and value.startswith('0x'):
+                 normalized_output[output_key] = value
+             elif isinstance(value, str) and not value.startswith('0x') and all(c in '0123456789abcdefABCDEF' for c in value):
+                 normalized_output[output_key] = '0x' + value # Add prefix if missing hex
+             elif value is None or value == "": # Handle empty strings/None for bytes
+                 normalized_output[output_key] = '0x'
              else:
-                  parsed_data[original_key] = value_str # Keep addresses, data, etc. as strings
+                 print(f"Warning: Unexpected value '{value}' for hex field '{key}'. Storing as is.")
+                 normalized_output[output_key] = value
         else:
-             # Keep gwei strings as is for other fields (if any), or just store string
-            parsed_data[original_key] = value_str
-            
-    return parsed_data
+             # Store unrecognized keys as is
+             normalized_output[output_key] = value
+             
+    return normalized_output
 
 
 def format_user_op_data(user_op_data: dict) -> str:
     """
-    Formats intermediate UserOperation data (dict) into the final 
-    PackedUserOperation JSON string, handling optional fields.
-    
-    Args:
-        user_op_data: Dictionary representing the UserOperation.
-
-    Returns:
-        A JSON string representation of the PackedUserOperation.
+    Formats normalized UserOperation data (dict) into the final 
+    PackedUserOperation JSON string, handling optional fields and packing.
     """
-    # Helper to safely get data and provide default values
+    # Helper to safely get data (case-insensitive keys already handled by normalization)
     def get_data(key, default=None):
-        # Prioritize direct key, then case-insensitive for common variations
-        val = user_op_data.get(key, None)
-        if val is not None: return val
-        # Try common case variations if initial lookup fails
-        for k, v in user_op_data.items():
-            if k.lower() == key.lower(): return v
-        return default
+        return user_op_data.get(key, default)
 
-    # --- Optional Field Defaults --- 
+    # --- Optional Field Defaults & Constants --- 
     ZERO_ADDRESS = '0x' + '0' * 40
     EMPTY_BYTES = '0x'
     ZERO_BYTES32 = '0x' + '0' * 64
 
-    # Get data - gas fees should now be integers (wei)
-    factory = get_data('factory')
-    factoryData = get_data('factoryData')
-    paymaster = get_data('paymaster')
-    paymasterData = get_data('paymasterData')
-    paymasterVerificationGasLimit_in = get_data('paymasterVerificationGasLimit', 0)
-    paymasterPostOpGasLimit_in = get_data('paymasterPostOpGasLimit', 0)
-    verificationGasLimit_in = get_data('verificationGasLimit', 0)
-    callGasLimit_in = get_data('callGasLimit', 0)
-    maxFeePerGas_in = get_data('maxFeePerGas', 0) # Default to 0 (int wei)
-    maxPriorityFeePerGas_in = get_data('maxPriorityFeePerGas', 0) # Default to 0 (int wei)
-    preVerificationGas_in = get_data('preVerificationGas', '0') # Keep as string/int for now
-    nonce_in = get_data('nonce', '0') # Keep as string/int for now
-    sender_in = get_data('sender', ZERO_ADDRESS)
-    callData_in = get_data('callData', EMPTY_BYTES)
-    signature_in = get_data('signature', EMPTY_BYTES)
-
-    # --- Format/Pack Required and Optional Fields --- 
+    # --- Format/Pack Fields --- 
 
     # Helper to format uint128 to hex (32 chars, no prefix)
     def format_uint128_hex_noprefix(val):
-         if isinstance(val, str):
-            try: val = int(val) if not val.startswith('0x') else int(val, 16)
-            except ValueError: raise ValueError(f"Cannot convert {val} to int for uint128")
-         elif not isinstance(val, int):
+         val = to_int_if_hex(val) # Convert hex string to int first if needed
+         if not isinstance(val, int):
             try: val = int(val)
-            except (ValueError, TypeError): raise ValueError(f"Cannot convert {val} to int for uint128")
+            except (ValueError, TypeError): raise ValueError(f"Cannot convert '{val}' to int for uint128")
          if val < 0 or val >= (1 << 128):
              raise ValueError(f"Value {val} out of range for uint128")
          return f"{val:032x}"
 
-    # Nonce & PreVerificationGas (convert hex/int string to simple string)
-    nonce_str = str(nonce_in) if not (isinstance(nonce_in, str) and nonce_in.startswith('0x')) else str(int(nonce_in, 16))
-    preVerificationGas_str = str(preVerificationGas_in) if not (isinstance(preVerificationGas_in, str) and preVerificationGas_in.startswith('0x')) else str(int(preVerificationGas_in, 16))
+    # Get core fields (expecting specific types from normalization)
+    sender = get_data('sender', ZERO_ADDRESS)
+    nonce = get_data('nonce', 0)
+    preVerificationGas = get_data('preverificationgas', 0)
+    callData = get_data('calldata', EMPTY_BYTES)
+    signature = get_data('signature', EMPTY_BYTES)
+    maxFeePerGas = get_data('maxfeepergas', 0)
+    maxPriorityFeePerGas = get_data('maxpriorityfeepergas', 0)
+    callGasLimit = get_data('callgaslimit', 0)
+    verificationGasLimit = get_data('verificationgaslimit', 0)
+    
+    # Handle initCode (prioritize existing, then construct)
+    initCode = get_data('initcode', None)
+    if initCode is None:
+        factory = get_data('factory')
+        factoryData = get_data('factorydata', EMPTY_BYTES) 
+        if factory and factory != ZERO_ADDRESS:
+            f_data_hex = factoryData[2:] if factoryData.startswith('0x') else factoryData
+            initCode = f"{factory}{f_data_hex}"
+        else:
+            initCode = EMPTY_BYTES
+    elif not isinstance(initCode, str) or not initCode.startswith('0x'):
+         print(f"Warning: Provided initCode '{initCode}' is not a valid hex string. Using '0x'.")
+         initCode = EMPTY_BYTES
 
-    # initCode
-    if factory and factory != ZERO_ADDRESS:
-        factoryData_val = factoryData if factoryData else EMPTY_BYTES
-        f_data_hex = factoryData_val[2:] if factoryData_val.startswith('0x') else factoryData_val
-        initCode = f"{factory}{f_data_hex}"
-    else:
-        initCode = EMPTY_BYTES
+    # Handle paymasterAndData (prioritize existing, then construct)
+    paymasterAndData = get_data('paymasteranddata', None)
+    if paymasterAndData is None:
+        paymaster = get_data('paymaster')
+        paymasterData = get_data('paymasterdata', EMPTY_BYTES)
+        if paymaster and paymaster != ZERO_ADDRESS:
+            pm_data_hex = paymasterData[2:] if paymasterData.startswith('0x') else paymasterData
+            try:
+                pmVg = get_data('paymasterverificationgaslimit', 0)
+                pmPg = get_data('paymasterpostopgaslimit', 0)
+                pm_ver_gas_hex = format_uint128_hex_noprefix(pmVg)
+                pm_post_gas_hex = format_uint128_hex_noprefix(pmPg)
+                paymasterAndData = f"{paymaster}{pm_ver_gas_hex}{pm_post_gas_hex}{pm_data_hex}"
+            except ValueError as e:
+                print(f"Warning: Could not format paymaster gas limits ({e}). Omitting gas limits.")
+                paymasterAndData = f"{paymaster}{pm_data_hex}" # Fallback without gas limits
+        else:
+            paymasterAndData = EMPTY_BYTES
+    elif not isinstance(paymasterAndData, str) or not paymasterAndData.startswith('0x'):
+         print(f"Warning: Provided paymasterAndData '{paymasterAndData}' is not a valid hex string. Using '0x'.")
+         paymasterAndData = EMPTY_BYTES
 
-    # accountGasLimits
+    # Pack accountGasLimits
     try:
-        accountGasLimits = f"0x{format_uint128_hex_noprefix(verificationGasLimit_in)}{format_uint128_hex_noprefix(callGasLimit_in)}"
+        accountGasLimits = f"0x{format_uint128_hex_noprefix(verificationGasLimit)}{format_uint128_hex_noprefix(callGasLimit)}"
     except ValueError as e:
         print(f"Warning: Could not format accountGasLimits ({e}). Defaulting.")
         accountGasLimits = ZERO_BYTES32
 
-    # gasFees (use integer wei values directly)
+    # Pack gasFees
     try:
-        gasFees = f"0x{format_uint128_hex_noprefix(maxPriorityFeePerGas_in)}{format_uint128_hex_noprefix(maxFeePerGas_in)}"
+        gasFees = f"0x{format_uint128_hex_noprefix(maxPriorityFeePerGas)}{format_uint128_hex_noprefix(maxFeePerGas)}"
     except ValueError as e:
-         print(f"Warning: Could not format gasFees ({e}). Input Values: Prio={maxPriorityFeePerGas_in}, Max={maxFeePerGas_in}. Defaulting.")
+         print(f"Warning: Could not format gasFees ({e}). Input Values: Prio={maxPriorityFeePerGas}, Max={maxFeePerGas}. Defaulting.")
          gasFees = ZERO_BYTES32
-
-    # paymasterAndData
-    if paymaster and paymaster != ZERO_ADDRESS:
-        pm_data_val = paymasterData if paymasterData else EMPTY_BYTES
-        pm_data_hex = pm_data_val[2:] if pm_data_val.startswith('0x') else pm_data_val
-        try:
-            pm_ver_gas_hex = format_uint128_hex_noprefix(paymasterVerificationGasLimit_in)
-            pm_post_gas_hex = format_uint128_hex_noprefix(paymasterPostOpGasLimit_in)
-            paymasterAndData = f"{paymaster}{pm_ver_gas_hex}{pm_post_gas_hex}{pm_data_hex}"
-        except ValueError as e:
-            print(f"Warning: Could not format paymaster gas limits ({e}). Omitting.")
-            paymasterAndData = f"{paymaster}{pm_data_hex}"
-    else:
-        paymasterAndData = EMPTY_BYTES
 
     # Final Output Dict Construction
     output_dict = {
-        "sender": sender_in,
-        "nonce": nonce_str,
+        "sender": sender,
+        "nonce": str(nonce), # Store as string
         "initCode": initCode,
-        "callData": callData_in if callData_in else EMPTY_BYTES,
+        "callData": callData,
         "accountGasLimits": accountGasLimits,
-        "preVerificationGas": preVerificationGas_str,
+        "preVerificationGas": str(preVerificationGas), # Store as string
         "gasFees": gasFees,
         "paymasterAndData": paymasterAndData,
-        "signature": signature_in if signature_in else EMPTY_BYTES
+        "signature": signature
     }
 
     return json.dumps(output_dict, indent=2)
