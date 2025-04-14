@@ -35,23 +35,20 @@ The tool provides several commands:
 # Get help
 aa-script --help
 
-# Parse raw UserOp text to formatted JSON (PackedUserOperation format)
-aa-script parse "<raw_user_op_text>"
+# Format input (raw text, UserOp JSON, PackedUserOp JSON) to specified output JSON
+aa-script format "<input_data>" [--output <packed|userop>] # Default output is packed
 
-# Parse raw UserOp text to standard UserOperation JSON format
-aa-script toUserOpJson "<raw_user_op_text>"
+# Calculate UserOp hash from any input format
+aa-script userOpHash "<input_data>" --chainId <id> [--entrypoint <addr>]
 
-# Calculate UserOp hash
-aa-script userOpHash "<raw_user_op_text>" --chainId <id> [--entrypoint <addr>]
+# Recover signer (show all attempts) from any input format
+aa-script signer "<input_data>" --chainId <id> --signer [--entrypoint <addr>]
 
-# Recover signer (show all attempts)
-aa-script signer "<raw_user_op_text>" --chainId <id> --signer [--entrypoint <addr>]
+# Verify signer against a specific address from any input format
+aa-script signer "<input_data>" --chainId <id> --signer <expected_addr> [--entrypoint <addr>]
 
-# Verify signer against a specific address
-aa-script signer "<raw_user_op_text>" --chainId <id> --signer <expected_addr> [--entrypoint <addr>]
-
-# Generate debug cast call command
-aa-script debug "<raw_user_op_text>" --rpc-url <url>
+# Generate debug cast call command from any input format
+aa-script debug "<input_data>" --rpc-url <url>
 
 # Generate AND execute debug cast call command
 aa-script debug "<raw_user_op_text>" --rpc-url <url> --run

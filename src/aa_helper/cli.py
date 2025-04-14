@@ -17,13 +17,11 @@ def main():
     parser = argparse.ArgumentParser(description="Parse UserOperation text, calculate hashes, verify signatures, and debug calls.")
     subparsers = parser.add_subparsers(dest='command', required=True, help='Sub-command help')
 
-    # --- `parse` subcommand -> Now formats to PackedUserOp ---
-    parser_parse = subparsers.add_parser('parse', help='Parse/normalize input and output PackedUserOperation JSON.') # Clarified help
-    parser_parse.add_argument("raw_input", help="Raw UserOperation text, UserOp JSON, or PackedUserOp JSON. Wrap in quotes.")
-
-    # --- `toUserOpJson` subcommand (NEW) ---
-    parser_to_userop = subparsers.add_parser('toUserOpJson', help='Parse/normalize input and output standard UserOperation JSON.')
-    parser_to_userop.add_argument("raw_input", help="Raw UserOperation text, UserOp JSON, or PackedUserOp JSON. Wrap in quotes.")
+    # --- `format` subcommand (replaces parse and toUserOpJson) ---
+    parser_format = subparsers.add_parser('format', help='Parse/normalize input and output JSON in specified format.')
+    parser_format.add_argument("raw_input", help="Raw UserOperation text, UserOp JSON, or PackedUserOp JSON. Wrap in quotes.")
+    parser_format.add_argument("--output", choices=['packed', 'userop'], default='packed', 
+                             help="Output format: 'packed' for PackedUserOperation JSON (default), 'userop' for standard UserOperation JSON.")
 
     # --- `userOpHash` subcommand ---
     parser_hash = subparsers.add_parser('userOpHash', help='Calculate the EIP-4337 UserOperation hash from any input format.') # Updated help
@@ -60,18 +58,16 @@ def main():
             sys.exit(1)
 
         # --- Command Dispatch ---
-        if args.command == 'parse':
-            # Action: Format intermediate dict to PackedUserOp JSON
-            final_json = format_user_op_data(user_op_intermediate_data)
-            print("--- Formatted PackedUserOperation JSON ---")
-            print(final_json)
+        if args.command == 'format': # New command
+            if args.output == 'userop':
+                output_json = format_to_user_op_json(user_op_intermediate_data)
+                print("--- Standard UserOperation JSON ---")
+                print(output_json)
+            else: # Default is 'packed'
+                output_json = format_user_op_data(user_op_intermediate_data)
+                print("--- Formatted PackedUserOperation JSON ---")
+                print(output_json)
         
-        elif args.command == 'toUserOpJson': # New command
-            # Action: Format intermediate dict to standard UserOp JSON
-            user_op_json = format_to_user_op_json(user_op_intermediate_data)
-            print("--- Standard UserOperation JSON ---")
-            print(user_op_json)
-
         elif args.command == 'userOpHash':
             # Action: Format to Packed, calculate userOpHash
             final_json = format_user_op_data(user_op_intermediate_data)
