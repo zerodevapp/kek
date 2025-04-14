@@ -26,6 +26,12 @@ dependencies = [
     "ruff>=0.11.5",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "ruff>=0.11.5",  # Already in main dependencies, but including here for clarity
+]
+
 [project.scripts]
 kek = "kek.cli:cli"
 
