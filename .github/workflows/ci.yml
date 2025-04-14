@@ -39,9 +39,9 @@ jobs:
       shell: bash
 
     - name: Lint with Ruff
-      run: uv run --system ruff check .
+      run: uv run ruff check .
       shell: bash
 
     - name: Run tests with Pytest
-      run: uv run --system pytest -v
+      run: uv run pytest -v
       shell: bash 
