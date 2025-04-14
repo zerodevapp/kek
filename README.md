@@ -17,8 +17,11 @@ The tool provides several commands:
 # Get help
 aa-script --help
 
-# Parse raw UserOp text to formatted JSON
+# Parse raw UserOp text to formatted JSON (PackedUserOperation format)
 aa-script parse "<raw_user_op_text>"
+
+# Parse raw UserOp text to standard UserOperation JSON format
+aa-script toUserOpJson "<raw_user_op_text>"
 
 # Calculate UserOp hash
 aa-script userOpHash "<raw_user_op_text>" --chainId <id> [--entrypoint <addr>]

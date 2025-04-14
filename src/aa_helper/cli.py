@@ -5,7 +5,7 @@ import traceback
 
 # Relative imports for package modules
 # from .parsing import parse_text_to_json, format_json_to_solidity_struct
-from .parsing import detect_and_load_input, format_user_op_data # Updated imports
+from .parsing import detect_and_load_input, format_user_op_data, format_to_user_op_json # Updated imports
 from .hashing import calculate_user_op_hash, eip191_hash_hex, eip191_hash_message, hex_to_bytes
 from .signature import recover_signer
 from .debug import run_debug_command
@@ -17,9 +17,13 @@ def main():
     parser = argparse.ArgumentParser(description="Parse UserOperation text, calculate hashes, verify signatures, and debug calls.")
     subparsers = parser.add_subparsers(dest='command', required=True, help='Sub-command help')
 
-    # --- `parse` subcommand ---
-    parser_parse = subparsers.add_parser('parse', help='Parse/normalize UserOp input and output formatted JSON.') # Updated help
+    # --- `parse` subcommand -> Now formats to PackedUserOp ---
+    parser_parse = subparsers.add_parser('parse', help='Parse/normalize input and output PackedUserOperation JSON.') # Clarified help
     parser_parse.add_argument("raw_input", help="Raw UserOperation text, UserOp JSON, or PackedUserOp JSON. Wrap in quotes.")
+
+    # --- `toUserOpJson` subcommand (NEW) ---
+    parser_to_userop = subparsers.add_parser('toUserOpJson', help='Parse/normalize input and output standard UserOperation JSON.')
+    parser_to_userop.add_argument("raw_input", help="Raw UserOperation text, UserOp JSON, or PackedUserOp JSON. Wrap in quotes.")
 
     # --- `userOpHash` subcommand ---
     parser_hash = subparsers.add_parser('userOpHash', help='Calculate the EIP-4337 UserOperation hash from any input format.') # Updated help
@@ -55,25 +59,30 @@ def main():
             traceback.print_exc()
             sys.exit(1)
 
-        # --- Command Dispatch --- 
+        # --- Command Dispatch ---
         if args.command == 'parse':
-            # Action: Format the intermediate data and print
+            # Action: Format intermediate dict to PackedUserOp JSON
             final_json = format_user_op_data(user_op_intermediate_data)
             print("--- Formatted PackedUserOperation JSON ---")
             print(final_json)
         
+        elif args.command == 'toUserOpJson': # New command
+            # Action: Format intermediate dict to standard UserOp JSON
+            user_op_json = format_to_user_op_json(user_op_intermediate_data)
+            print("--- Standard UserOperation JSON ---")
+            print(user_op_json)
+
         elif args.command == 'userOpHash':
-            # Action: Format, calculate userOpHash
+            # Action: Format to Packed, calculate userOpHash
             final_json = format_user_op_data(user_op_intermediate_data)
             user_op_hash = calculate_user_op_hash(final_json, args.entrypoint, args.chainId)
             print("--- Calculated UserOpHash ---")
             print(user_op_hash)
 
         elif args.command == 'signer':
-            # Action: Format, all hashes, recovery/verification
+            # Action: Format to Packed, all hashes, recovery/verification
             expected_signer_address = None
             if isinstance(args.signer, str):
-                # ... (validation remains the same) ...
                 expected_signer_address = args.signer
                 if not expected_signer_address.startswith('0x') or len(expected_signer_address) != 42:
                     print(f"Error: Invalid format for --signer address: {expected_signer_address}")
@@ -83,10 +92,8 @@ def main():
                     print(f"Error: Invalid hex characters in --signer address: {expected_signer_address}")
                     sys.exit(1)
 
-            # Format the intermediate data first to ensure all fields are present/packed
             final_json = format_user_op_data(user_op_intermediate_data)
             
-            # Calculate Hashes using the formatted JSON string
             user_op_hash = calculate_user_op_hash(final_json, args.entrypoint, args.chainId)
             user_op_hash_bytes = hex_to_bytes(user_op_hash)
             eip191_hash_of_hash_bytes_hex = eip191_hash_hex(user_op_hash)
@@ -94,20 +101,24 @@ def main():
             eip191_hash_of_hash_string_hex = eip191_hash_message(user_op_hash)
             eip191_digest_string_bytes = hex_to_bytes(eip191_hash_of_hash_string_hex)
 
-            # Use intermediate data *only* to get original signature if needed
-            # Pass formatted final_json to functions needing struct fields
-            signature_hex = user_op_intermediate_data.get("signature") 
-            # Attempt case-insensitive lookup if direct fails
-            if not signature_hex:
-                 for k, v in user_op_intermediate_data.items():
-                     if k.lower() == "signature":
-                         signature_hex = v
-                         break
-
             if args.signer is None:
-                 print("\n--- Signature Recovery Skipped (no --signer flag provided) ---")
+                print("\n--- Signature Recovery Skipped (no --signer flag provided) ---")
             else:
                 print("\n--- Signature Recovery --- ")
+                signature_hex = user_op_intermediate_data.get("signature") 
+                if not signature_hex:
+                     for k, v in user_op_intermediate_data.items():
+                         if k.lower() == "signature":
+                             signature_hex = v
+                             break
+                
+                sender_from_op = user_op_intermediate_data.get("sender")
+                if not sender_from_op:
+                     for k, v in user_op_intermediate_data.items():
+                         if k.lower() == "sender":
+                             sender_from_op = v
+                             break
+
                 if not signature_hex or signature_hex == '0x':
                     print("No signature provided in input.")
                 elif len(signature_hex) != 132:
@@ -118,7 +129,6 @@ def main():
                     recovered_from_eip191_string = recover_signer(eip191_digest_string_bytes, signature_hex)
 
                     if expected_signer_address:
-                        # ... (Verification logic remains the same) ...
                         print(f"Verifying signature against expected signer: {expected_signer_address}")
                         print(f"Signature provided: {signature_hex}")
                         match_found_signer = False
@@ -134,14 +144,6 @@ def main():
                         if not match_found_signer:
                             print(f"  ❌ Signature did NOT recover specified signer ({expected_signer_address}).")
                     else: # --signer flag only
-                        # ... (Display all results logic remains the same) ...
-                        # Get sender from intermediate for context
-                        sender_from_op = user_op_intermediate_data.get("sender")
-                        if not sender_from_op:
-                             for k, v in user_op_intermediate_data.items():
-                                 if k.lower() == "sender":
-                                     sender_from_op = v
-                                     break
                         if sender_from_op: print(f"Sender (from Op): {sender_from_op}")
                         print(f"Signature:        {signature_hex}")
                         print("\nShowing all recovery results:")

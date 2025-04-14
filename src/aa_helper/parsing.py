@@ -255,5 +255,96 @@ def format_user_op_data(user_op_data: dict) -> str:
 
     return json.dumps(output_dict, indent=2)
 
+def format_to_user_op_json(user_op_data: dict) -> str:
+    """
+    Formats normalized UserOperation data (dict) into the standard
+    EIP-4337 UserOperation JSON structure (numbers as hex strings).
+    Handles optional fields, using defaults if missing.
+    """
+    # Helper to safely get data (case-insensitive keys already handled by normalization)
+    def get_data(key, default=None):
+        return user_op_data.get(key, default)
+
+    # --- Optional Field Defaults & Constants ---
+    ZERO_ADDRESS = '0x' + '0' * 40
+    EMPTY_BYTES = '0x'
+    ZERO_INT = 0
+
+    # --- Get Normalized Data (expecting ints/hex strings from detect_and_load_input) ---
+    # Use lowercase keys as defined in the normalization step
+    sender = get_data('sender', ZERO_ADDRESS)
+    nonce = get_data('nonce', ZERO_INT)
+    factory = get_data('factory') # Get potential factory address
+    factoryData = get_data('factorydata') # Get potential factory data
+    initCode = get_data('initcode') # Get potential pre-built initCode
+    callData = get_data('calldata', EMPTY_BYTES)
+    callGasLimit = get_data('callgaslimit', ZERO_INT)
+    verificationGasLimit = get_data('verificationgaslimit', ZERO_INT)
+    preVerificationGas = get_data('preverificationgas', ZERO_INT)
+    maxFeePerGas = get_data('maxfeepergas', ZERO_INT) # Expecting wei int
+    maxPriorityFeePerGas = get_data('maxpriorityfeepergas', ZERO_INT) # Expecting wei int
+    paymaster = get_data('paymaster') # Get potential paymaster address
+    paymasterVerificationGasLimit = get_data('paymasterverificationgaslimit', ZERO_INT) # Use ZERO_INT default
+    paymasterPostOpGasLimit = get_data('paymasterpostopgaslimit', ZERO_INT) # Use ZERO_INT default
+    paymasterData = get_data('paymasterdata') # Get potential paymaster data
+    paymasterAndData = get_data('paymasteranddata') # Get potential pre-built paymasterAndData
+    signature = get_data('signature', EMPTY_BYTES)
+
+    # --- Build the UserOperation JSON dictionary --- 
+    output_dict = {
+        "sender": sender,
+        "nonce": hex(to_int_if_hex(nonce)), # Ensure conversion from potential string/hex
+        "callData": callData if callData else EMPTY_BYTES,
+        "callGasLimit": hex(to_int_if_hex(callGasLimit)),
+        "verificationGasLimit": hex(to_int_if_hex(verificationGasLimit)),
+        "preVerificationGas": hex(to_int_if_hex(preVerificationGas)),
+        "maxFeePerGas": hex(maxFeePerGas), # Already int (wei)
+        "maxPriorityFeePerGas": hex(maxPriorityFeePerGas), # Already int (wei)
+        "signature": signature if signature else EMPTY_BYTES
+    }
+
+    # --- Handle Factory/InitCode --- 
+    # Prefer factory/factoryData if present, otherwise use initCode if present
+    if factory and factory != ZERO_ADDRESS:
+        output_dict["factory"] = factory
+        output_dict["factoryData"] = factoryData if factoryData else EMPTY_BYTES
+    elif initCode and initCode != EMPTY_BYTES:
+        # If only initCode is available (e.g., from Packed JSON input where unpacking is hard),
+        # include it directly. We cannot reliably split factory/factoryData here.
+        print("Warning: Including pre-built 'initCode'. Cannot reliably split into factory/factoryData.")
+        output_dict["initCode"] = initCode 
+        # Avoid adding empty factory/factoryData if initCode is used
+        if "factory" in output_dict: del output_dict["factory"]
+        if "factoryData" in output_dict: del output_dict["factoryData"]
+
+    # --- Handle Paymaster/PaymasterAndData --- 
+    # Prefer paymaster/components if present, otherwise use paymasterAndData if present
+    if paymaster and paymaster != ZERO_ADDRESS:
+        output_dict["paymaster"] = paymaster
+        output_dict["paymasterVerificationGasLimit"] = hex(to_int_if_hex(paymasterVerificationGasLimit))
+        output_dict["paymasterPostOpGasLimit"] = hex(to_int_if_hex(paymasterPostOpGasLimit))
+        output_dict["paymasterData"] = paymasterData if paymasterData else EMPTY_BYTES
+    elif paymasterAndData and paymasterAndData != EMPTY_BYTES:
+        # If only paymasterAndData is available, include it directly.
+        print("Warning: Including pre-built 'paymasterAndData'. Cannot reliably split components.")
+        output_dict["paymasterAndData"] = paymasterAndData
+        # Avoid adding empty paymaster/components if paymasterAndData is used
+        if "paymaster" in output_dict: del output_dict["paymaster"]
+        if "paymasterVerificationGasLimit" in output_dict: del output_dict["paymasterVerificationGasLimit"]
+        if "paymasterPostOpGasLimit" in output_dict: del output_dict["paymasterPostOpGasLimit"]
+        if "paymasterData" in output_dict: del output_dict["paymasterData"]
+        
+    # Re-order keys for standard UserOp format
+    ordered_keys = [
+        "sender", "nonce", "factory", "factoryData", "initCode", # Include both possibilities
+        "callData", "callGasLimit", "verificationGasLimit", "preVerificationGas", 
+        "maxFeePerGas", "maxPriorityFeePerGas", "paymaster", 
+        "paymasterVerificationGasLimit", "paymasterPostOpGasLimit", "paymasterData", 
+        "paymasterAndData", "signature" # Include both possibilities
+    ]
+    ordered_output_dict = {k: output_dict[k] for k in ordered_keys if k in output_dict}
+
+    return json.dumps(ordered_output_dict, indent=2)
+
 # Remove original parse_text_to_json function if it exists above
 # Remove original format_json_to_solidity_struct function if it exists above 
