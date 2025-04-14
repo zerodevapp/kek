@@ -8,7 +8,6 @@ from .utils import hex_to_bytes
 
 # Correct function selectors
 SIMULATE_ENTRY_POINT_SELECTOR = "0xc18f5226"
-ENTRYPOINT_DELEGATE_AND_REVERT_SELECTOR = "0x850aaf62"  # simulateEntryPoint selector
 SIMULATE_HANDLE_OP_LAST_SELECTOR = "0x263934db"  # simulateHandleOpLast selector
 
 SIMULATE_TARGET = "0xf384fddcaf70336dca46404d809153a0029a0253"
