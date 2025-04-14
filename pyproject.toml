@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "kek"
 version = "0.1.0"
 authors = [
-  { name="User", email="user@example.com" }, # Replace with actual if desired
+  { name="taek lee", email="leekt216@gmail.com" },
 ]
 description = "KEK: Kernel Examination Kit - A CLI tool to parse, hash, and debug EIP-4337 UserOperations for Kernel."
 readme = "README.md"
@@ -28,8 +28,8 @@ dependencies = [
 kek = "kek.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/user/kek" # Example URL
-Issues = "https://github.com/user/kek/issues" # Example URL 
+Homepage = "https://github.com/zerodevapp/kek"
+Issues = "https://github.com/zerodevapp/kek/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]  # Look for packages in the src directory
