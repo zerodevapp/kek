@@ -27,6 +27,6 @@ def recover_signer(digest_bytes: bytes, signature_hex: str) -> str | None:
         signature = keys.Signature(signature_bytes=signature_bytes)
         public_key = signature.recover_public_key_from_msg_hash(digest_bytes)
         return public_key.to_checksum_address()
-    except (BadSignature, ValueError, TypeError, Exception) as e: # Catch potential errors
+    except (BadSignature, ValueError, TypeError, Exception): # Catch potential errors
         # print(f"Debug: Recovery failed for digest {digest_bytes.hex()} - {e}")
         return None 

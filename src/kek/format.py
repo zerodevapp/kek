@@ -1,8 +1,6 @@
 import json
-import re # For simple JSON check
 
 # Use relative imports for shared utility
-from .utils import hex_to_bytes
 
 # --- Parsing Helpers ---
 
@@ -239,6 +237,10 @@ def format_user_op_data(user_op_data: dict) -> str:
     except ValueError as e:
          print(f"Warning: Could not format gasFees ({e}). Input Values: Prio={maxPriorityFeePerGas}, Max={maxFeePerGas}. Defaulting.")
          gasFees = ZERO_BYTES32
+
+    # --- DEBUG PRINTS ---
+    print(f"DEBUG: Before final dict: sender={sender}, initCode={initCode[:20] if initCode else initCode}..., paymasterAndData={paymasterAndData[:20] if paymasterAndData else paymasterAndData}...")
+    # --- END DEBUG PRINTS ---
 
     # Final Output Dict Construction
     output_dict = {

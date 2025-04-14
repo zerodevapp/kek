@@ -21,11 +21,13 @@ classifiers = [
 dependencies = [
     "pysha3 >= 1.0.0",
     "eth-abi >= 4.0.0", # Check for appropriate minimum versions
-    "eth-keys >= 0.4.0", 
+    "eth-keys >= 0.4.0",
+    "click >= 8.0.0",
+    "ruff>=0.11.5",
 ]
 
 [project.scripts]
-kek = "kek.cli:main"
+kek = "kek.cli:cli"
 
 [project.urls]
 Homepage = "https://github.com/zerodevapp/kek"

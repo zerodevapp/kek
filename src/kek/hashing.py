@@ -5,6 +5,7 @@ from eth_abi import encode
 # Use relative import for shared utility
 # from utils import hex_to_bytes 
 from .utils import hex_to_bytes 
+# Import the unpacking function
 
 def keccak(data_bytes: bytes) -> bytes:
     """Calculates the Keccak-256 hash of the given bytes."""

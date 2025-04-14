@@ -11,19 +11,21 @@ from .format import format_user_op_data # Updated import
 ENTRY_POINT_V07 = "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
 
 def run_debug_command(args, user_op_intermediate_data):
-    """Generates and prints the handleOps cast call command."""
+    """Generates and optionally executes the handleOps cast call command."""
+    # print("\n--- Debug handleOps Call --- ") # Reduced verbosity
     beneficiary = "0x0000000000000000000000000000000000000000" # Hardcoded zero address
+
     # -- Prepare UserOperation data for encoding -- 
     try:
-        # Format the intermediate data using the updated function
-        intermediate_json_str = json.dumps(user_op_intermediate_data)
-        final_json = format_user_op_data(intermediate_json_str)
-        user_op_dict = json.loads(final_json)
+        # 1. Format the intermediate data dictionary into the final PackedUserOp JSON string
+        final_json_string = format_user_op_data(user_op_intermediate_data)
+        # 2. Load the final formatted JSON string into a dictionary for tuple creation
+        user_op_dict = json.loads(final_json_string) 
     except ValueError as e:
-        print(f"Error formatting UserOperation data: {e}")
+        print(f"Error formatting/loading UserOperation data: {e}")
         sys.exit(1)
     except Exception as e: # Catch other potential errors
-        print(f"Unexpected error during UserOperation formatting: {e}")
+        print(f"Unexpected error during UserOperation formatting/loading: {e}")
         sys.exit(1)
 
     try:
@@ -73,5 +75,4 @@ def run_debug_command(args, user_op_intermediate_data):
     ]
     cast_command_string = ' '.join(cast_command_list) # For printing
 
-    # -- Print cast command --
     print(cast_command_string)
