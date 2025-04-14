@@ -5,7 +5,7 @@ import json
 # Use relative imports
 from .utils import hex_to_bytes
 # from .parsing import format_json_to_solidity_struct # Need to format first
-from .parsing import format_user_op_data # Updated import
+from .format import format_user_op_data # Updated import
 
 # Hardcode EntryPoint v0.7 address here
 ENTRY_POINT_V07 = "0x0000000071727De22E5E9d8BAf0edAc6f37da032"

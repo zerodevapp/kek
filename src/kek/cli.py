@@ -5,7 +5,7 @@ import traceback
 
 # Relative imports for package modules
 # from .parsing import parse_text_to_json, format_json_to_solidity_struct
-from .parsing import detect_and_load_input, format_user_op_data, format_to_user_op_json # Updated imports
+from .format import detect_and_load_input, format_user_op_data, format_to_user_op_json # Updated imports
 from .hashing import calculate_user_op_hash, eip191_hash_hex, eip191_hash_message, hex_to_bytes
 from .signature import recover_signer
 from .debug import run_debug_command
