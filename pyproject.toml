@@ -3,12 +3,12 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "aa_helper"
+name = "kek"
 version = "0.1.0"
 authors = [
   { name="User", email="user@example.com" }, # Replace with actual if desired
 ]
-description = "A CLI tool to parse, hash, and debug EIP-4337 UserOperations."
+description = "KEK: Kernel Examination Kit - A CLI tool to parse, hash, and debug EIP-4337 UserOperations for Kernel."
 readme = "README.md"
 requires-python = ">=3.8"
 classifiers = [
@@ -25,11 +25,11 @@ dependencies = [
 ]
 
 [project.scripts]
-aa-script = "aa_helper.cli:main"
+kek = "kek.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/user/aa-helper" # Example URL
-Issues = "https://github.com/user/aa-helper/issues" # Example URL 
+Homepage = "https://github.com/user/kek" # Example URL
+Issues = "https://github.com/user/kek/issues" # Example URL 
 
 [tool.setuptools.packages.find]
 where = ["src"]  # Look for packages in the src directory

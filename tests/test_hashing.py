@@ -1,13 +1,9 @@
-import sys
-print("--- sys.path ---", sys.path)
 import unittest
 import json
 
-# Use absolute imports now that test is outside package
-# from .parsing import detect_and_load_input, format_user_op_data
-# from .hashing import calculate_user_op_hash
-from aa_helper.parsing import detect_and_load_input, format_user_op_data
-from aa_helper.hashing import calculate_user_op_hash
+# Imports should now work if package structure is correct and installed
+from kek.parsing import detect_and_load_input, format_user_op_data
+from kek.hashing import calculate_user_op_hash
 
 class TestUserOpHashing(unittest.TestCase):
     def test_user_op_without_factory(self):
