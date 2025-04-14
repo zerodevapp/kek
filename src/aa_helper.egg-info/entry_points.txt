@@ -1,2 +1,0 @@
-[console_scripts]
-aa-script = aa_helper.cli:main
