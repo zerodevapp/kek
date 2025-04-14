@@ -334,22 +334,14 @@ def format_to_user_op_json(user_op_data: dict) -> str:
     # Add signature last
     ordered_items.append(("signature", signature if signature else EMPTY_BYTES))
 
-    # Convert the ordered list of tuples into a string that LOOKS like JSON 
-    # but maintains order. We cannot directly use json.dumps with guaranteed order easily.
-    # This manual formatting is brittle but necessary for exact key order matching.
-    json_string_parts = []
-    json_string_parts.append("{")
-    for i, (key, value) in enumerate(ordered_items):
-        # Ensure values are properly quoted JSON strings
-        json_value = json.dumps(value) 
-        json_string_parts.append(f'  "{key}": {json_value}')
-        if i < len(ordered_items) - 1:
-            json_string_parts.append(",")
-    json_string_parts.append("}")
+    # Convert the ordered list of tuples into a proper OrderedDict and use standard json serialization
+    # Python 3.7+ dictionaries preserve insertion order, so this will maintain our key order
+    ordered_dict = {}
+    for key, value in ordered_items:
+        ordered_dict[key] = value
     
-    # Join with newline and indent for readability (matches json.dumps indent=2)
-    # This manual creation ensures key order for the test.
-    return '\n'.join(json_string_parts)
+    # Use standard json.dumps with proper indentation
+    return json.dumps(ordered_dict, indent=2)
 
 # Remove original parse_text_to_json function if it exists above
 # Remove original format_json_to_solidity_struct function if it exists above 

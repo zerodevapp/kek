@@ -8,8 +8,10 @@ from .format import detect_and_load_input, format_user_op_data, format_to_user_o
 from .hashing import calculate_user_op_hash, eip191_hash_hex, eip191_hash_message, hex_to_bytes
 from .signature import recover_signer
 from .debug import run_debug_command
+from .simulate import run_simulate_command
+from .constants import ENTRY_POINT_V07
 
-DEFAULT_ENTRY_POINT = "0x0000000071727De22E5E9d8BAf0edAc6f37da032" # v0.7
+DEFAULT_ENTRY_POINT = ENTRY_POINT_V07
 
 # --- Main Click Group --- 
 @click.group(context_settings=dict(help_option_names=['-h', '--help']))
@@ -196,6 +198,24 @@ def debug_cmd(raw_input, rpc_url):
     
     run_debug_command(debug_args, user_op_intermediate_data)
 
+# --- `simulate` command ---
+@cli.command('simulate')
+@click.argument('raw_input', type=str)
+@click.option('--rpc-url', required=True, help="RPC URL for the estimation command.")
+def simulate_cmd(raw_input, rpc_url):
+    """Simulate a UserOperation with Pimlico estimation address."""
+    user_op_intermediate_data = load_input_data(raw_input)
+    # Pass args as a simple object/dict if needed by run_simulate_command
+    class Args: pass
+    simulate_args = Args()
+    simulate_args.rpc_url = rpc_url
+    
+    try:
+        run_simulate_command(simulate_args, user_op_intermediate_data)
+    except Exception as e:
+        click.echo(f"\nAn error occurred during simulation: {e}", err=True)
+        traceback.print_exc()
+        sys.exit(1)
 
 # --- Entry point for `kek` command ---
 if __name__ == '__main__':

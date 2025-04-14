@@ -1,18 +1,20 @@
-import sys
+from .constants import PIMLICO_ESTIMATION_ADDRESS, ENTRY_POINT_V07
 from eth_abi import encode
+import sys
 import json
 
-# Use relative imports
+from .format import format_user_op_data
 from .utils import hex_to_bytes
-# from .parsing import format_json_to_solidity_struct # Need to format first
-from .format import format_user_op_data # Updated import
-from .constants import ENTRY_POINT_V07
 
-def run_debug_command(args, user_op_intermediate_data):
-    """Generates and optionally executes the handleOps cast call command."""
-    # print("\n--- Debug handleOps Call --- ") # Reduced verbosity
-    beneficiary = "0x0000000000000000000000000000000000000000" # Hardcoded zero address
+# Correct function selectors
+SIMULATE_ENTRY_POINT_SELECTOR = "0xc18f5226"
+ENTRYPOINT_DELEGATE_AND_REVERT_SELECTOR = "0x850aaf62"  # simulateEntryPoint selector
+SIMULATE_HANDLE_OP_LAST_SELECTOR = "0x263934db"  # simulateHandleOpLast selector
 
+SIMULATE_TARGET = "0xf384fddcaf70336dca46404d809153a0029a0253"
+def run_simulate_command(args, user_op_intermediate_data):
+    """Generate a command to simulate a UserOperation using Pimlico's estimation contract."""
+    
     # -- Prepare UserOperation data for encoding -- 
     try:
         # 1. Format the intermediate data dictionary into the final PackedUserOp JSON string
@@ -47,30 +49,42 @@ def run_debug_command(args, user_op_intermediate_data):
          
     ops_array = [user_op_tuple]
 
+    # --- Step 1: Encode the simulateHandleOpLast call ---
     user_op_abi_type = '(address,uint256,bytes,bytes,bytes32,uint256,bytes32,bytes,bytes)'
-    handle_ops_input_types = [f'{user_op_abi_type}[]', 'address']
     
-    # -- ABI Encode handleOps call --
     try:
-        encoded_call_data = encode(
-            handle_ops_input_types,
-            [ops_array, beneficiary] # Use hardcoded zero address
+        # Encode simulateHandleOpLast with just the user ops
+        encoded_simulate_last = encode(
+            [f'{user_op_abi_type}[]'],  # Just the user ops array
+            [ops_array]
         )
     except Exception as e:
-        print(f"\nError ABI encoding handleOps data: {e}")
+        print(f"\nError encoding simulateHandleOpLast data: {e}")
         sys.exit(1)
 
-    handle_ops_selector = "0x765e827f" # v0.7 selector
-    full_calldata = handle_ops_selector + encoded_call_data.hex()
+    simulate_last_data = SIMULATE_HANDLE_OP_LAST_SELECTOR + encoded_simulate_last.hex()
+
+    # --- Step 2: Encode the simulateEntryPoint call ---
+    try:
+        # Encode simulateEntryPoint with the entrypoint and simulateHandleOpLast calldata
+        encoded_simulate = encode(
+            ["address", "bytes[]"],
+            [ENTRY_POINT_V07, [bytes.fromhex(simulate_last_data[2:])]]  # Remove 0x prefix
+        )
+    except Exception as e:
+        print(f"\nError encoding simulateEntryPoint parameters: {e}")
+        sys.exit(1)
+        
+    simulate_calldata = SIMULATE_ENTRY_POINT_SELECTOR + encoded_simulate.hex()
     
     # -- Construct cast command list and string --
     cast_command_list = [
         "cast", "call", 
-        ENTRY_POINT_V07, 
-        full_calldata, 
-        "--rpc-url", args.rpc_url, 
+        PIMLICO_ESTIMATION_ADDRESS, 
+        simulate_calldata, 
+        "--rpc-url", args.rpc_url,
         "--trace"
     ]
-    cast_command_string = ' '.join(cast_command_list) # For printing
+    cast_command_string = ' '.join(cast_command_list)  # For printing
 
-    print(cast_command_string)
+    print(cast_command_string) 
