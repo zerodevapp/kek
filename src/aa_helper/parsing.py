@@ -1,6 +1,9 @@
 import json
 import re # For simple JSON check
 
+# Use relative imports for shared utility
+from .utils import hex_to_bytes
+
 # --- Parsing Helpers ---
 
 def parse_gas_value_to_wei(value) -> int:
@@ -37,6 +40,17 @@ def to_int_if_hex(value):
             return value # Return original if not valid hex
     return value
 
+def unpack_uint128_pair(packed_hex: str) -> tuple[int, int]:
+    """Unpacks a bytes32 hex string into two uint128 integers."""
+    if not isinstance(packed_hex, str) or not packed_hex.startswith('0x') or len(packed_hex) != 66:
+        raise ValueError(f"Invalid packed hex format for unpacking: '{packed_hex}'")
+    try:
+        val1_hex = packed_hex[2:34]  # First 128 bits (32 hex chars)
+        val2_hex = packed_hex[34:]   # Second 128 bits (32 hex chars)
+        return int(val1_hex, 16), int(val2_hex, 16)
+    except ValueError as e:
+        raise ValueError(f"Could not unpack hex string '{packed_hex}': {e}")
+
 # --- Input Handling & Normalization ---
 
 def detect_and_load_input(input_str: str) -> dict:
@@ -48,11 +62,31 @@ def detect_and_load_input(input_str: str) -> dict:
     if is_likely_json:
         try:
             raw_data = json.loads(input_str)
-            # Try to normalize keys to lowercase for easier processing
-            # Handle potential conflicts carefully if needed (not done here)
-            normalized_data = {k.lower(): v for k, v in raw_data.items()}
+            normalized_data = {k.lower(): v for k, v in raw_data.items()} 
             data.update(normalized_data)
             # print("Detected JSON input.")
+            # Check if it's likely PackedUserOp JSON AFTER initial load
+            if all(k in data for k in ["sender", "nonce", "accountgaslimits", "gasfees"]):
+                # print("Detected PackedUserOperation JSON input. Unpacking...")
+                # Unpack gas limits
+                try:
+                    vgl_unpacked, cgl_unpacked = unpack_uint128_pair(data.get('accountgaslimits', '0x' + '0'*64))
+                    data['verificationgaslimit'] = vgl_unpacked
+                    data['callgaslimit'] = cgl_unpacked
+                except ValueError as e:
+                    print(f"Warning: Failed to unpack accountGasLimits from input: {e}")
+                # Unpack gas fees
+                try:
+                    prio_unpacked, max_unpacked = unpack_uint128_pair(data.get('gasfees', '0x' + '0'*64))
+                    # Note the order: prio first, then max in Packed format
+                    data['maxpriorityfeepergas'] = prio_unpacked
+                    data['maxfeepergas'] = max_unpacked
+                except ValueError as e:
+                     print(f"Warning: Failed to unpack gasFees from input: {e}")
+                # We don't delete the packed keys, normalization below will handle types
+            
+            # Fallthrough to normalize all loaded JSON data
+
         except json.JSONDecodeError:
             is_likely_json = False # Treat as raw text if JSON parsing fails
 
@@ -67,46 +101,53 @@ def detect_and_load_input(input_str: str) -> dict:
             if colon_index == -1: continue
             key = line[:colon_index].strip().lower() # Normalize key
             value_str = line[colon_index + 1:].strip()
-            temp_data[key] = value_str
+            temp_data[key] = value_str # Store value as string for now
         data.update(temp_data)
 
-    # --- Normalize values to consistent types --- 
+    # --- Normalize values to consistent types (applies to ALL input types now) --- 
     normalized_output = {}
     int_keys = ["nonce", "callgaslimit", "verificationgaslimit", "preverificationgas", "paymasterverificationgaslimit", "paymasterpostopgaslimit"]
     gas_keys = ["maxfeepergas", "maxpriorityfeepergas"]
+    # Include packed keys here, but they will be handled as hex strings
     hex_keys = ["sender", "initcode", "calldata", "accountgaslimits", "gasfees", "paymasteranddata", "signature", "factory", "factorydata", "paymaster", "paymasterdata"]
 
     for key, value in data.items():
         l_key = key.lower()
-        original_key = key # Keep original for output dict if needed?
-        output_key = l_key # Use lowercase internally
+        output_key = l_key 
         
         if output_key in int_keys:
             try:
-                # Convert potential hex strings to int
+                # Ensure it's not None before converting
+                if value is None: raise TypeError("None value for int key")
                 normalized_output[output_key] = int(value, 16) if isinstance(value, str) and value.startswith('0x') else int(value)
             except (ValueError, TypeError):
-                print(f"Warning: Could not convert '{key}' value '{value}' to int. Storing as is.")
-                normalized_output[output_key] = value # Store original on error
+                print(f"Warning: Could not convert '{key}' value '{value}' to int. Setting to 0.")
+                normalized_output[output_key] = 0 # Default to 0 on error
         elif output_key in gas_keys:
              try:
+                if value is None: raise TypeError("None value for gas key")
                 normalized_output[output_key] = parse_gas_value_to_wei(value)
-             except ValueError as e:
+             except (ValueError, TypeError) as e:
                  print(f"Warning: Could not parse gas value for '{key}': {e}. Setting to 0.")
                  normalized_output[output_key] = 0
         elif output_key in hex_keys:
-            # Ensure hex strings are 0x-prefixed and lowercase? Let's keep original for now.
-             if isinstance(value, str) and value.startswith('0x'):
-                 normalized_output[output_key] = value
-             elif isinstance(value, str) and not value.startswith('0x') and all(c in '0123456789abcdefABCDEF' for c in value):
-                 normalized_output[output_key] = '0x' + value # Add prefix if missing hex
-             elif value is None or value == "": # Handle empty strings/None for bytes
+             if isinstance(value, str):
+                 if value.startswith('0x'):
+                     normalized_output[output_key] = value
+                 elif not value.startswith('0x') and all(c in '0123456789abcdefABCDEF' for c in value):
+                     normalized_output[output_key] = '0x' + value
+                 elif value == "": # Handle empty strings for bytes
+                      normalized_output[output_key] = '0x'
+                 else:
+                     # Might be a non-hex string mistakenly assigned (e.g. from raw text)
+                     print(f"Warning: Non-hex value '{value}' found for expected hex field '{key}'. Setting to '0x'.")
+                     normalized_output[output_key] = '0x' 
+             elif value is None:
                  normalized_output[output_key] = '0x'
              else:
-                 print(f"Warning: Unexpected value '{value}' for hex field '{key}'. Storing as is.")
-                 normalized_output[output_key] = value
+                 print(f"Warning: Unexpected type '{type(value)}' for hex field '{key}'. Setting to '0x'.")
+                 normalized_output[output_key] = '0x'
         else:
-             # Store unrecognized keys as is
              normalized_output[output_key] = value
              
     return normalized_output

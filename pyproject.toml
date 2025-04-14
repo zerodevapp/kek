@@ -30,3 +30,6 @@ aa-script = "aa_helper.cli:main"
 [project.urls]
 Homepage = "https://github.com/user/aa-helper" # Example URL
 Issues = "https://github.com/user/aa-helper/issues" # Example URL 
+
+[tool.setuptools.packages.find]
+where = ["src"]  # Look for packages in the src directory
