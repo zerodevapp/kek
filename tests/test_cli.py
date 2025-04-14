@@ -158,30 +158,29 @@ class TestKekCli(unittest.TestCase):
 
     # # --- Signer Tests ---
 
-    # def test_signer_recover_raw(self):
-    #     runner = CliRunner()
-    #     # Use --signer flag without address to trigger recovery mode
-    #     result = runner.invoke(cli, ['signer', RAW_TEXT_INPUT, '--chainId', str(CHAIN_ID), '--entrypoint', ENTRY_POINT, '--signer', EXPECTED_SIGNER])
-    #     self.assertSuccess(result)
-    #     self.assertOutputContains(result, "--- Signature Recovery ---")
-    #     self.assertOutputContains(result, f"Sender (from Op): {EXPECTED_SENDER}")
-    #     # Check if *one* of the digests recovered the sender - exact digest may vary
-    #     self.assertOutputContains(result, f"Recovered: {EXPECTED_SENDER}") 
+    def test_signer_recover_raw(self):
+        runner = CliRunner()
+        # Use --signer flag without address to trigger recovery mode
+        result = runner.invoke(cli, ['signer', RAW_TEXT_INPUT, '--chainId', str(CHAIN_ID), '--entrypoint', ENTRY_POINT, '--signer', EXPECTED_SIGNER])
+        self.assertSuccess(result)
+        self.assertOutputContains(result, "--- Signature Recovery ---")
+        self.assertOutputContains(result, f"Verifying signature against expected signer: {EXPECTED_SIGNER}")
+        self.assertOutputContains(result, "✅ Matches signer")
 
-    # def test_signer_verify_correct_json(self):
-    #     runner = CliRunner()
-    #     result = runner.invoke(cli, ['signer', JSON_INPUT, '--chainId', str(CHAIN_ID), '--entrypoint', ENTRY_POINT, '--signer', EXPECTED_SIGNER])
-    #     self.assertSuccess(result)
-    #     self.assertOutputContains(result, f"Verifying signature against expected signer: {EXPECTED_SIGNER}")
-    #     self.assertOutputContains(result, "✅ Matches signer")
+    def test_signer_verify_correct_json(self):
+        runner = CliRunner()
+        result = runner.invoke(cli, ['signer', JSON_INPUT, '--chainId', str(CHAIN_ID), '--entrypoint', ENTRY_POINT, '--signer', EXPECTED_SIGNER])
+        self.assertSuccess(result)
+        self.assertOutputContains(result, f"Verifying signature against expected signer: {EXPECTED_SIGNER}")
+        self.assertOutputContains(result, "✅ Matches signer")
 
-    # def test_signer_verify_incorrect_raw(self):
-    #     runner = CliRunner()
-    #     incorrect_signer = "0x1111111111111111111111111111111111111111"
-    #     result = runner.invoke(cli, ['signer', RAW_TEXT_INPUT, '--chainId', str(CHAIN_ID), '--entrypoint', ENTRY_POINT, '--signer', incorrect_signer])
-    #     self.assertSuccess(result) # Command should still succeed even if verification fails
-    #     self.assertOutputContains(result, f"Verifying signature against expected signer: {incorrect_signer}")
-    #     self.assertOutputContains(result, f"❌ Signature did NOT recover specified signer ({incorrect_signer})")
+    def test_signer_verify_incorrect_raw(self):
+        runner = CliRunner()
+        incorrect_signer = "0x1111111111111111111111111111111111111111"
+        result = runner.invoke(cli, ['signer', RAW_TEXT_INPUT, '--chainId', str(CHAIN_ID), '--entrypoint', ENTRY_POINT, '--signer', incorrect_signer])
+        self.assertSuccess(result) # Command should still succeed even if verification fails
+        self.assertOutputContains(result, f"Verifying signature against expected signer: {incorrect_signer}")
+        self.assertOutputContains(result, f"❌ Signature did NOT recover specified signer ({incorrect_signer})")
 
     # --- Debug Test ---
 
