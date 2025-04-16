@@ -8,7 +8,7 @@ from .utils import hex_to_bytes
 from .format import format_user_op_data # Updated import
 from .constants import ENTRY_POINT_V07
 
-def run_debug_command(args, user_op_intermediate_data):
+def encode_debug_command(args, user_op_intermediate_data):
     """Generates and optionally executes the handleOps cast call command."""
     # print("\n--- Debug handleOps Call --- ") # Reduced verbosity
     beneficiary = "0x0000000000000000000000000000000000000000" # Hardcoded zero address

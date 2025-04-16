@@ -7,8 +7,8 @@ import click # Import click
 from .format import detect_and_load_input, format_user_op_data, format_to_user_op_json # Updated imports
 from .hashing import calculate_user_op_hash, eip191_hash_hex, eip191_hash_message, hex_to_bytes
 from .signature import recover_signer
-from .debug import run_debug_command
-from .simulate import run_simulate_command
+from .debug import encode_debug_command
+from .simulate import encode_simulate_command
 from .constants import ENTRY_POINT_V07
 
 DEFAULT_ENTRY_POINT = ENTRY_POINT_V07
@@ -191,12 +191,12 @@ def signer_cmd(raw_input, chainid, entrypoint, expected_signer_address, verify_o
 def debug_cmd(raw_input, rpc_url):
     """Generate or execute `cast call --trace` for EntryPoint.handleOps."""
     user_op_intermediate_data = load_input_data(raw_input)
-    # Pass args as a simple object/dict if needed by run_debug_command
+    # Pass args as a simple object/dict if needed by encode_debug_command
     class Args: pass
     debug_args = Args()
     debug_args.rpc_url = rpc_url
     
-    run_debug_command(debug_args, user_op_intermediate_data)
+    encode_debug_command(debug_args, user_op_intermediate_data)
 
 # --- `simulate` command ---
 @cli.command('simulate')
@@ -205,13 +205,13 @@ def debug_cmd(raw_input, rpc_url):
 def simulate_cmd(raw_input, rpc_url):
     """Simulate a UserOperation with Pimlico estimation address."""
     user_op_intermediate_data = load_input_data(raw_input)
-    # Pass args as a simple object/dict if needed by run_simulate_command
+    # Pass args as a simple object/dict if needed by encode_simulate_command
     class Args: pass
     simulate_args = Args()
     simulate_args.rpc_url = rpc_url
     
     try:
-        run_simulate_command(simulate_args, user_op_intermediate_data)
+        encode_simulate_command(simulate_args, user_op_intermediate_data)
     except Exception as e:
         click.echo(f"\nAn error occurred during simulation: {e}", err=True)
         traceback.print_exc()

@@ -1,17 +1,18 @@
 from .constants import PIMLICO_ESTIMATION_ADDRESS, ENTRY_POINT_V07
-from eth_abi import encode
+from eth_abi import encode, decode
 import sys
 import json
+from web3 import Web3
 
 from .format import format_user_op_data
-from .utils import hex_to_bytes
+from .utils import hex_to_bytes, decode_simulate_lastOp_error, decode_simulate_lastOp_result
 
 # Correct function selectors
 SIMULATE_ENTRY_POINT_SELECTOR = "0xc18f5226"
 SIMULATE_HANDLE_OP_LAST_SELECTOR = "0x263934db"  # simulateHandleOpLast selector
 
 SIMULATE_TARGET = "0xf384fddcaf70336dca46404d809153a0029a0253"
-def run_simulate_command(args, user_op_intermediate_data):
+def encode_simulate_command(args, user_op_intermediate_data):
     """Generate a command to simulate a UserOperation using Pimlico's estimation contract."""
     
     # -- Prepare UserOperation data for encoding -- 
@@ -75,7 +76,73 @@ def run_simulate_command(args, user_op_intermediate_data):
         sys.exit(1)
         
     simulate_calldata = SIMULATE_ENTRY_POINT_SELECTOR + encoded_simulate.hex()
-    
+    # check simulation return data
+    w3 = Web3(Web3.HTTPProvider(args.rpc_url))
+    abi = """
+[
+    {
+        "inputs": [{"internalType": "address", "name": "entryPoint", "type": "address"}, {"internalType": "bytes[]", "name": "userOps", "type": "bytes[]"}],
+        "name": "simulateEntryPoint",
+        "outputs": [{"internalType": "bytes[]", "name": "results", "type": "bytes[]"}],
+        "stateMutability": "view",
+        "type": "function"
+    }
+    ]
+    """
+
+    """
+    struct ReturnInfo {
+        uint256 preOpGas;
+        uint256 prefund;
+        uint256 accountValidationData;
+        uint256 paymasterValidationData;
+        bytes paymasterContext;
+    }
+
+    struct AggregatorStakeInfo {
+        address aggregator;
+        StakeInfo stakeInfo;
+    }
+
+    struct StakeInfo {
+        uint256 stake;
+        uint256 unstakeDelaySec;
+    }
+
+    struct ValidationResult {
+        ReturnInfo returnInfo;
+        StakeInfo senderInfo;
+        StakeInfo factoryInfo;
+        StakeInfo paymasterInfo;
+        AggregatorStakeInfo aggregatorInfo;
+    }
+    """
+
+    """
+    struct ExecutionResult {
+        uint256 preOpGas;
+        uint256 paid;
+        uint256 accountValidationData;
+        uint256 paymasterValidationData;
+        uint256 paymasterVerificationGasLimit;
+        uint256 paymasterPostOpGasLimit;
+        bool targetSuccess;
+        bytes targetResult;
+    }
+    """
+    contract = w3.eth.contract(address=Web3.to_checksum_address(PIMLICO_ESTIMATION_ADDRESS), abi=abi)
+    results = contract.functions.simulateEntryPoint(ENTRY_POINT_V07, [bytes.fromhex(simulate_last_data[2:])]).call()
+    decoded_results = decode( ['bool', 'bytes'], results[0][4:])
+    # if simulation was successful, print the execution result
+    if decoded_results[0]:
+        exeuction_result = decode_simulate_lastOp_result(decoded_results[1])
+        print(exeuction_result)
+    else:
+        print(decode_simulate_lastOp_error(decoded_results[1]))
+
+
+    # validation_result = decode( ['((uint256,uint256,uint256,uint256,bytes),(uint256,uint256),(uint256,uint256),(uint256,uint256),(address,(uint256,uint256)))'], decoded_results[1])
+    # print(validation_result)
     # -- Construct cast command list and string --
     cast_command_list = [
         "cast", "call", 
