@@ -5,7 +5,7 @@ import json
 from web3 import Web3
 
 from .format import format_user_op_data
-from .utils import hex_to_bytes, decode_simulate_lastOp_error, decode_simulate_lastOp_result
+from .utils import hex_to_bytes, decode_simulate_lastOp_error, decode_simulate_lastOp_result, to_cast_trace_command
 
 # Correct function selectors
 SIMULATE_ENTRY_POINT_SELECTOR = "0xc18f5226"
@@ -46,7 +46,35 @@ def encode_simulate_command(args, user_op_intermediate_data):
     except (ValueError, TypeError) as e:
          print(f"Error converting UserOperation fields for ABI encoding: {e}")
          sys.exit(1)
-         
+
+    simulation_result = {}
+    # simulate the user op last
+    try:
+        simulation_result.execution_result = simulate_user_op_last(args.rpc_url, user_op_tuple)
+    except FailedUserOp as e:
+        print(e)
+        cast_command_list = e.command()
+        cast_command_list.append("--rpc-url")
+        cast_command_list.append(args.rpc_url)
+        cast_command_string = ' '.join(cast_command_list)
+        print(cast_command_string)
+        sys.exit(1)
+
+    # validation_result = decode( ['((uint256,uint256,uint256,uint256,bytes),(uint256,uint256),(uint256,uint256),(uint256,uint256),(address,(uint256,uint256)))'], decoded_results[1])
+    # print(validation_result)
+    # -- Construct cast command list and string --
+    # cast_command_list = [
+    #     "cast", "call", 
+    #     PIMLICO_ESTIMATION_ADDRESS, 
+    #     simulate_calldata, 
+    #     "--rpc-url", args.rpc_url,
+    #     "--trace"
+    # ]
+    # cast_command_string = ' '.join(cast_command_list)  # For printing
+
+    # print(cast_command_string)
+
+def simulate_user_op_last(rpc_url,user_op_tuple) -> object:
     ops_array = [user_op_tuple]
 
     # --- Step 1: Encode the simulateHandleOpLast call ---
@@ -77,7 +105,7 @@ def encode_simulate_command(args, user_op_intermediate_data):
         
     simulate_calldata = SIMULATE_ENTRY_POINT_SELECTOR + encoded_simulate.hex()
     # check simulation return data
-    w3 = Web3(Web3.HTTPProvider(args.rpc_url))
+    w3 = Web3(Web3.HTTPProvider(rpc_url))
     abi = """
 [
     {
@@ -135,22 +163,20 @@ def encode_simulate_command(args, user_op_intermediate_data):
     decoded_results = decode( ['bool', 'bytes'], results[0][4:])
     # if simulation was successful, print the execution result
     if decoded_results[0]:
-        exeuction_result = decode_simulate_lastOp_result(decoded_results[1])
-        print(exeuction_result)
+        details = decode_simulate_lastOp_result(decoded_results[1])
+        return details
     else:
-        print(decode_simulate_lastOp_error(decoded_results[1]))
+        raise FailedUserOp(decode_simulate_lastOp_error(decoded_results[1]), simulate_calldata)
 
 
-    # validation_result = decode( ['((uint256,uint256,uint256,uint256,bytes),(uint256,uint256),(uint256,uint256),(uint256,uint256),(address,(uint256,uint256)))'], decoded_results[1])
-    # print(validation_result)
-    # -- Construct cast command list and string --
-    cast_command_list = [
-        "cast", "call", 
-        PIMLICO_ESTIMATION_ADDRESS, 
-        simulate_calldata, 
-        "--rpc-url", args.rpc_url,
-        "--trace"
-    ]
-    cast_command_string = ' '.join(cast_command_list)  # For printing
+class FailedUserOp(Exception):
+    def __init__(self, message, debugCallData):
+        self.message = message
+        self.debugCallData = debugCallData
+        super().__init__(self.message)
 
-    print(cast_command_string) 
+    def __str__(self):
+        return f"Failed UserOp : {self.message[:4]}"
+    
+    def command(self):
+        return to_cast_trace_command(SIMULATE_TARGET, self.debugCallData)
