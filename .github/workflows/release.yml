@@ -88,6 +88,6 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ steps.release.outputs.tag }}
 
-      - name: Publish | Upload package to PyPI
-        uses: pypa/gh-action-pypi-publish@SHA1_HASH  # vX.X.X
-        if: steps.release.outputs.released == 'true'
+      # - name: Publish | Upload package to PyPI
+      #   uses: pypa/gh-action-pypi-publish@SHA1_HASH  # vX.X.X
+      #   if: steps.release.outputs.released == 'true'
