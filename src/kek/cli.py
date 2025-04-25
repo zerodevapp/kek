@@ -1,3 +1,5 @@
+from pathlib import Path
+import re
 import sys
 import traceback
 import click # Import click
@@ -14,6 +16,10 @@ from .constants import ENTRY_POINT_V07
 
 DEFAULT_ENTRY_POINT = ENTRY_POINT_V07
 
+def get_version():
+    init = Path("src/kek/__init__.py").read_text()
+    return re.search(r'^__version__ = ["\']([^"\']+)["\']', init, re.M).group(1)
+
 # --- Main Click Group --- 
 @click.group(context_settings=dict(help_option_names=['-h', '--help']))
 @click.version_option(package_name='zerodev-kek', message='%(package)s version %(version)s') # Added standard version option
@@ -29,7 +35,7 @@ def cli():
 @cli.command('version')
 def version_cmd():
     """Display the installed version of KEK."""
-    version = importlib.metadata.version('zerodev-kek')
+    version = get_version()
     click.echo(f"kek version {version}")
 
 # --- Helper to load input (used by multiple commands) ---

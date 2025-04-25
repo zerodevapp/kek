@@ -3,6 +3,7 @@ repos:
     hooks:
       - id: commitizen-check
         name: Commitizen Check
-        entry: cz check --rev-range origin/master..
+        entry: cz check --commit-msg-file $1
         language: system
+        stages: [commit-msg]
         pass_filenames: false
