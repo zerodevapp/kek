@@ -23,6 +23,16 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
+    - name: Verify Python Version
+      run: |
+        INSTALLED_VERSION=$(python --version)
+        echo "Using Python version: $INSTALLED_VERSION"
+        if [[ "$INSTALLED_VERSION" != *"${{ matrix.python-version }}"* ]]; then
+          echo "Error: Python version mismatch! Expected ${{ matrix.python-version }}, got $INSTALLED_VERSION"
+          exit 1
+        fi
+      shell: bash
+
     - name: Install uv
       run: curl -LsSf https://astral.sh/uv/install.sh | sh
 
