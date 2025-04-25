@@ -1,6 +1,7 @@
 import sys
 import traceback
 import click # Import click
+import importlib.metadata # Added for version
 
 # Relative imports for package modules
 # from .parsing import parse_text_to_json, format_json_to_solidity_struct
@@ -15,6 +16,7 @@ DEFAULT_ENTRY_POINT = ENTRY_POINT_V07
 
 # --- Main Click Group --- 
 @click.group(context_settings=dict(help_option_names=['-h', '--help']))
+@click.version_option(package_name='zerodev-kek', message='%(package)s version %(version)s') # Added standard version option
 def cli():
     """KEK: Kernel Examination Kit
 
@@ -22,6 +24,13 @@ def cli():
     EIP-4337 UserOperations, especially for Kernel.
     """
     pass
+
+# --- `version` subcommand ---
+@cli.command('version')
+def version_cmd():
+    """Display the installed version of KEK."""
+    version = importlib.metadata.version('zerodev-kek')
+    click.echo(f"kek version {version}")
 
 # --- Helper to load input (used by multiple commands) ---
 def load_input_data(raw_input_str):
