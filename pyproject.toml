@@ -42,3 +42,9 @@ Issues = "https://github.com/zerodevapp/kek/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]  # Look for packages in the src directory
+
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "0.1.0"
+tag_format = "v$version"
