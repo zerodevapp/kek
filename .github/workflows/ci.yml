@@ -46,13 +46,16 @@ jobs:
       run: uv sync --all-extras
       shell: bash
 
-    - name: Check kek version # Added version check step
+    - name: Check kek version # Use dynamic version from __init__.py
       run: |
-        KEK_VERSION=$(uv run kek version)
-        echo "Reported version: $KEK_VERSION"
-        EXPECTED_VERSION="kek version 0.1.0"
-        if [ "$KEK_VERSION" != "$EXPECTED_VERSION" ]; then
-          echo "Error: Version mismatch! Expected '$EXPECTED_VERSION', got '$KEK_VERSION'"
+        KEK_VERSION_OUTPUT=$(uv run kek version)
+        echo "Reported version output: $KEK_VERSION_OUTPUT"
+        # Extract version from __init__.py using Python
+        EXPECTED_VERSION_NUM=$(python -c "import re; print(re.search(r'^__version__\s*=\s*[\"']([^\"']+)["']', open('src/kek/__init__.py').read(), re.MULTILINE).group(1))")
+        EXPECTED_OUTPUT="kek version $EXPECTED_VERSION_NUM"
+        echo "Expected version output: $EXPECTED_OUTPUT"
+        if [ "$KEK_VERSION_OUTPUT" != "$EXPECTED_OUTPUT" ]; then
+          echo "Error: Version mismatch! Expected '$EXPECTED_OUTPUT', got '$KEK_VERSION_OUTPUT'"
           exit 1
         fi
       shell: bash

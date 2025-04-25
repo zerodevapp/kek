@@ -1,1 +1,3 @@
-# Init file for aa_helper package 
+# Init file for kek package 
+
+__version__ = "0.1.0"
