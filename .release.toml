@@ -1,0 +1,8 @@
+[semantic_release]
+version_variable = ["src/kek/__init__.py:__version__"]
+build_command = "uv pip install build && python -m build"
+upload_to_pypi = true
+upload_to_release = true
+changelog_file = "CHANGELOG.md"
+commit_parser = "conventional"
+tag_format = "v{version}"

@@ -26,6 +26,14 @@ dependencies = [
     "ruff>=0.11.5",
     "web3 >= 6.0.0", # Added web3 dependency
 ]
+[tool.semantic_release]
+version_variables = ["src/kek/__init__.py:__version__"]
+build_command     = "uv pip install build && python -m build"
+upload_to_pypi    = true
+upload_to_release = true
+changelog_file    = "CHANGELOG.md"
+commit_parser     = "conventional"
+tag_format        = "v{version}"
 
 [project.optional-dependencies]
 dev = [
