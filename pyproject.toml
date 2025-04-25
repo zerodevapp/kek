@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "zerodev-kek"
-version = "0.1.0"
 authors = [
   { name="taek lee", email="leekt216@gmail.com" },
 ]
+dynamic = ["version"]
 description = "KEK: Kernel Examination Kit - A CLI tool to parse, hash, and debug EIP-4337 UserOperations for Kernel."
 readme = "README.md"
 requires-python = ">=3.8"
