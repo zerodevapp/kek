@@ -22,7 +22,7 @@ jobs:
       - name: Install uv and semantic-release
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
-          uv pip install python-semantic-release build
+          uv pip install python-semantic-release build --system
 
       - name: Run Semantic Release
         run: semantic-release publish
