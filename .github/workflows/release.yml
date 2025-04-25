@@ -95,3 +95,10 @@ jobs:
       # - name: Publish | Upload package to PyPI
       #   uses: pypa/gh-action-pypi-publish@SHA1_HASH  # vX.X.X
       #   if: steps.release.outputs.released == 'true'
+      - name: Publish package to PyPI
+        if: steps.release.outputs.released == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          username: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          packages-dir: ./dist
