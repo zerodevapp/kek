@@ -1,4 +1,4 @@
-from .constants import PIMLICO_ESTIMATION_ADDRESS, ENTRY_POINT_V07
+from .constants import PIMLICO_ESTIMATION_ADDRESS, ENTRY_POINT_V07, SIMULATE_ENTRY_POINT_SELECTOR
 from eth_abi import encode, decode
 import sys
 import json
@@ -6,10 +6,6 @@ from web3 import Web3
 
 from .format import format_user_op_data
 from .utils import hex_to_bytes, decode_simulate_lastOp_error, decode_simulate_lastOp_result, to_cast_trace_command
-
-# Correct function selectors
-SIMULATE_ENTRY_POINT_SELECTOR = "0xc18f5226"
-SIMULATE_HANDLE_OP_LAST_SELECTOR = "0x263934db"  # simulateHandleOpLast selector
 
 SIMULATE_TARGET = "0xf384fddcaf70336dca46404d809153a0029a0253"
 def encode_simulate_command(args, user_op_intermediate_data):
