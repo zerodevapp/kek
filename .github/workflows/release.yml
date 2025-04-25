@@ -27,7 +27,7 @@ jobs:
           uv pip install python-semantic-release build --system
 
       - name: Run Semantic Release
-        run: semantic-release publish
+        run: semantic-release -vv publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
