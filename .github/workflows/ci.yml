@@ -10,32 +10,30 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy: # Added strategy matrix
+      fail-fast: false
+      matrix:
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Set up Python
+    - name: Set up Python ${{ matrix.python-version }} # Use matrix variable
       uses: actions/setup-python@v5
       with:
-        python-version: '3.10' # Specify your desired Python version
+        python-version: ${{ matrix.python-version }} # Use matrix variable
 
-    - name: Install uv
+    - name: Install uv # Combined uv install and PATH steps
       run: |
         curl -LsSf https://astral.sh/uv/install.sh | sh
         echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       shell: bash
-    
-    - name: activate uv
-      run: uv venv
-      shell: bash
 
-    - name: Install dependencies
-      run: |
-        uv pip install -e .[dev]
-        # If you don't use optional dev dependencies, use this instead:
-        # uv pip install --system -e .
-        # uv pip install --system pytest ruff click # Add other dev tools if needed
+    # Removed activate uv step, uv sync/run handle environment
+
+    - name: Install dependencies # Use uv sync
+      run: uv sync --all-extras
       shell: bash
 
     - name: Lint with Ruff

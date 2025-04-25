@@ -16,6 +16,9 @@ def hex_to_bytes(hex_string: str) -> bytes:
     except ValueError as e:
         raise ValueError(f"Invalid hex string for hex_to_bytes: '{hex_string[:20]}...'") from e 
 
+def to_cast_trace_command(target_address, call_data):
+    return ["cast", "call", target_address, call_data, "--trace"]
+
 def decode_simulate_lastOp_error(error_bytes: bytes) -> str:
     """Decodes an error bytes into a string."""
     # FailedOp(uint256,string) == 0x220266b6

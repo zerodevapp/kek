@@ -5,10 +5,7 @@ A CLI tool to parse, hash, verify signatures, and debug EIP-4337 UserOperations,
 ## Installation
 
 ```bash
-# Navigate to the project directory (containing pyproject.toml)
-cd <project-directory>
-# Install in editable mode (use a virtual environment)
-pip install -e .
+pip install zerodev_kek
 ```
 
 ## Usage
