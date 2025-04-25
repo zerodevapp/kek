@@ -3,7 +3,6 @@ import re
 import sys
 import traceback
 import click # Import click
-import importlib.metadata # Added for version
 
 # Relative imports for package modules
 # from .parsing import parse_text_to_json, format_json_to_solidity_struct
