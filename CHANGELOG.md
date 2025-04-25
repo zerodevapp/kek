@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.1.3 (2025-04-25)
+
+### Bug Fixes
+
+- Pypi release fixed
+  ([`b1d8767`](https://github.com/zerodevapp/kek/commit/b1d8767b5bf598b96a1774cb88807b3c6cf27b10))
+
+
 ## v0.1.2 (2025-04-25)
 
 ### Bug Fixes
