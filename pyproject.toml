@@ -29,7 +29,7 @@ dependencies = [
 
 [tool.semantic_release]
 version_variables = ["src/kek/__init__.py:__version__"]
-build_command     = "uv pip install build && python -m build"
+build_command     = "pip install build && python -m build"
 upload_to_pypi    = true
 upload_to_vcs_release = true
 changelog_file    = "CHANGELOG.md"
