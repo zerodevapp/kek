@@ -3,6 +3,8 @@ import re
 import sys
 import traceback
 import click # Import click
+import importlib.metadata
+from click_extra import table_format_option, pass_context # Import from click-extra
 
 # Relative imports for package modules
 # from .parsing import parse_text_to_json, format_json_to_solidity_struct
@@ -12,6 +14,7 @@ from .signature import recover_signer
 from .debug import encode_debug_command
 from .simulate import encode_simulate_command
 from .constants import ENTRY_POINT_V07
+from .explain import explain_user_op # Added import
 
 DEFAULT_ENTRY_POINT = ENTRY_POINT_V07
 
@@ -201,16 +204,42 @@ def signer_cmd(raw_input, chainid, entrypoint, expected_signer_address, verify_o
 # --- `debug` command ---
 @cli.command('debug')
 @click.argument('raw_input', type=str)
-@click.option('--rpc-url', required=True, help="RPC URL for the cast command.")
-def debug_cmd(raw_input, rpc_url):
-    """Generate or execute `cast call --trace` for EntryPoint.handleOps."""
+@click.option('--rpc-url', help="RPC URL (required if not using --explain).")
+@click.option('--explain', is_flag=True, default=False, help='Explain the UserOperation instead of generating a cast command.')
+@table_format_option
+@pass_context
+def debug_cmd(ctx, raw_input, rpc_url, explain):
+    """Generate `cast call --trace` or explain the UserOperation."""
     user_op_intermediate_data = load_input_data(raw_input)
-    # Pass args as a simple object/dict if needed by encode_debug_command
-    class Args: pass
-    debug_args = Args()
-    debug_args.rpc_url = rpc_url
     
-    encode_debug_command(debug_args, user_op_intermediate_data)
+    if explain:
+        # Need rpc_url if explaining to do on-chain checks
+        if not rpc_url:
+             click.echo("Error: --rpc-url is required when using --explain with the debug command.", err=True)
+             sys.exit(1)
+        explain_user_op(ctx, user_op_intermediate_data, rpc_url) # Pass rpc_url if explaining
+    else:
+        # Require rpc-url if not explaining (for cast trace)
+        if not rpc_url:
+            click.echo("Error: --rpc-url is required when not using --explain.", err=True)
+            sys.exit(1)
+            
+        # Existing logic for cast command
+        class Args: pass
+        debug_args = Args()
+        debug_args.rpc_url = rpc_url
+        encode_debug_command(debug_args, user_op_intermediate_data)
+
+# --- `explain` command (New) ---
+@cli.command('explain')
+@click.argument('raw_input', type=str)
+@click.option('--rpc-url', required=True, envvar="RPC_URL", help="RPC URL for on-chain checks. Can also be set via RPC_URL env var.")
+@table_format_option # Keep table formatting if explain_user_op uses it
+@pass_context
+def explain_cmd(ctx, raw_input, rpc_url):
+    """Parse and explain the UserOperation, including on-chain checks."""
+    user_op_intermediate_data = load_input_data(raw_input)
+    explain_user_op(ctx, user_op_intermediate_data, rpc_url) # Always call explain_user_op
 
 # --- `simulate` command ---
 @cli.command('simulate')
