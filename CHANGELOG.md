@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.2.0 (2025-05-06)
+
+### Features
+
+- Explain
+  ([`5ef0e72`](https://github.com/zerodevapp/kek/commit/5ef0e72c79990563e765393cb0d0172ac5817de1))
+
+
 ## v0.1.3 (2025-04-25)
 
 ### Bug Fixes
