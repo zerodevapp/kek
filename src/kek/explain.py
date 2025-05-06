@@ -1,6 +1,5 @@
 import click
 from web3 import Web3
-from web3.exceptions import ContractLogicError
 from eth_abi import decode
 from .constants import VALIDATORS, ZERO_ADDRESS
 
@@ -94,9 +93,10 @@ def explain_user_op(ctx, user_op_data: dict, rpc_url: str):
 
             click.echo("\n  --- Parsed Nonce Components ---")
             ctx.print_table(data, headers)
-            if not is_valid:
+            if not is_valid and mode != 1:
                 click.echo(click.style("  Warning: Validator is inactive. This UserOperation might not be validated.", fg="red"))
-
+            elif not is_valid and mode == 1:
+                click.echo(click.style("  UserOp is on enable mode", fg="yellow"))
 
     # --- Add explanations for other fields later --- 
     click.echo("\n... (Explanation for other fields to be added)") 

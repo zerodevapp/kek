@@ -3,7 +3,6 @@ import re
 import sys
 import traceback
 import click # Import click
-import importlib.metadata
 from click_extra import table_format_option, pass_context # Import from click-extra
 
 # Relative imports for package modules
@@ -15,6 +14,9 @@ from .debug import encode_debug_command
 from .simulate import encode_simulate_command
 from .constants import ENTRY_POINT_V07
 from .explain import explain_user_op # Added import
+
+# Import the check logic
+from .check import get_executor_status_on_chain
 
 DEFAULT_ENTRY_POINT = ENTRY_POINT_V07
 
@@ -211,19 +213,13 @@ def signer_cmd(raw_input, chainid, entrypoint, expected_signer_address, verify_o
 def debug_cmd(ctx, raw_input, rpc_url, explain):
     """Generate `cast call --trace` or explain the UserOperation."""
     user_op_intermediate_data = load_input_data(raw_input)
-    
+    if not rpc_url:
+        click.echo("Error: --rpc-url is required when not using --explain.", err=True)
+        sys.exit(1)
+
     if explain:
-        # Need rpc_url if explaining to do on-chain checks
-        if not rpc_url:
-             click.echo("Error: --rpc-url is required when using --explain with the debug command.", err=True)
-             sys.exit(1)
         explain_user_op(ctx, user_op_intermediate_data, rpc_url) # Pass rpc_url if explaining
     else:
-        # Require rpc-url if not explaining (for cast trace)
-        if not rpc_url:
-            click.echo("Error: --rpc-url is required when not using --explain.", err=True)
-            sys.exit(1)
-            
         # Existing logic for cast command
         class Args: pass
         debug_args = Args()
@@ -259,6 +255,33 @@ def simulate_cmd(raw_input, rpc_url):
         click.echo(f"\nAn error occurred during simulation: {e}", err=True)
         traceback.print_exc()
         sys.exit(1)
+
+# --- `check` command group ---
+@cli.group('check', invoke_without_command=True, context_settings=dict(help_option_names=['-h', '--help']))
+@click.pass_context
+def check_cmd(ctx):
+    """Group of commands to check on-chain status."""
+    if ctx.invoked_subcommand is None:
+        click.echo(ctx.get_help())
+
+@check_cmd.command('executor')
+@click.option('--address', 'kernel_address', required=True, help="The KERNEL_ADDRESS to check.")
+@click.option('--executor', 'expected_executor_address', required=True, help="The EXECUTOR_ADDRESS to check for.")
+@click.option('--rpc-url', required=True, envvar="RPC_URL", help="RPC URL for on-chain interaction. Can also be set via RPC_URL env var.")
+def check_executor_cmd(kernel_address, expected_executor_address, rpc_url):
+    """Check if the given KERNEL_ADDRESS has the specific EXECUTOR_ADDRESS installed."""
+    
+    try :
+        executor_status = get_executor_status_on_chain(kernel_address, expected_executor_address, rpc_url)
+        if executor_status:
+            click.echo("Executor Installed")
+        else:
+            click.echo("Executor Not Installed")
+    except Exception as e:
+        click.echo(f"\nAn error occurred during executor check: {e}", err=True)
+        traceback.print_exc()
+        sys.exit(1)
+
 
 # --- Entry point for `kek` command ---
 if __name__ == '__main__':
